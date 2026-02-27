@@ -46,6 +46,6 @@ Use conventional commits:
 
 Example:
 
-```
+```bash
 feat(diff): detect column type changes
 ```

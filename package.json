@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Core engine for Schema Forge DSL parsing, diffing and SQL generation",
   "license": "ISC",
-  "author": "",
+  "author": "Xuby <diazxavier27@gmail.com>",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
+    "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
     "vitest": "^4.0.18"
   }
