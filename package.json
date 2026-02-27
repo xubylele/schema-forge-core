@@ -22,7 +22,8 @@
     "dev": "tsc -w"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.8",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
+    "vitest": "^4.0.18"
   }
 }

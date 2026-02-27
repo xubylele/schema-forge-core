@@ -1,0 +1,53 @@
+name: Release on Main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release preparation check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Check for changesets on main
+        id: check_changesets
+        run: |
+          CHANGESET_COUNT=$(find .changeset -name "*.md" ! -name "README.md" | wc -l | xargs)
+          echo "Found $CHANGESET_COUNT changeset(s)"
+          if [ "$CHANGESET_COUNT" -eq 0 ]; then
+            echo "No changesets found in this merge."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Release reminder
+        if: steps.check_changesets.outputs.skip == 'false'
+        run: |
+          echo "Main is protected. Version/changelog updates must come via PR."
+          echo "Publishing is handled by tag pushes (v*), not by pushes to main."
