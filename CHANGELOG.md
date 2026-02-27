@@ -1,5 +1,15 @@
 # @xubylele/schema-forge-core
 
+## 1.0.3
+
+### Patch Changes
+
+- c6c58b7: \* Update release workflow trigger to use `pull_request`
+
+  - Add repository metadata to `package.json`
+
+  These changes improve CI behavior and package metadata without modifying runtime logic or public API.
+
 ## 1.0.2
 
 ### Patch Changes
