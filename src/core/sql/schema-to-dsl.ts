@@ -1,4 +1,4 @@
-import type { DatabaseSchema } from '../../types/schema';
+import type { DatabaseSchema } from '../../types/schema.js';
 
 function renderColumn(column: {
   name: string;

@@ -1,5 +1,5 @@
-import type { ApplySqlOpsResult, ParseWarning, ParsedColumn, ParsedConstraint, SqlOp } from '../../types/sql';
-import type { DatabaseSchema, Table } from '../../types/schema';
+import type { ApplySqlOpsResult, ParseWarning, ParsedColumn, ParsedConstraint, SqlOp } from '../../types/sql.js';
+import type { DatabaseSchema, Table } from '../../types/schema.js';
 
 function toSchemaColumn(column: ParsedColumn) {
   return {

@@ -4,8 +4,8 @@ import type {
   StateColumn,
   StateFile,
   StateTable
-} from '../types/schema';
-import { ensureDir, fileExists, readJsonFile, writeJsonFile } from './fs';
+} from '../types/schema.js';
+import { ensureDir, fileExists, readJsonFile, writeJsonFile } from './fs.js';
 
 /**
  * Convert a DatabaseSchema to a StateFile

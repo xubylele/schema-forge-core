@@ -1,4 +1,4 @@
-import type { Column, DatabaseSchema } from '../types/schema';
+import type { Column, DatabaseSchema } from '../types/schema.js';
 
 export type SqlOp =
   | {
