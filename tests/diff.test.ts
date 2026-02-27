@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createSnapshot } from '../src/state/snapshot';
 import { diffSchemas } from '../src/diff/diff';
 import { parseSchema } from '../src/parser/parser';
-import { StateFile } from '../src/types/schema.types';
+import { StateFile } from '../src/types/schema';
 
 describe('diffSchemas', () => {
   it('creates a table when snapshot is empty', () => {

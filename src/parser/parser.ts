@@ -1,4 +1,10 @@
-import { Column, ColumnType, DatabaseSchema, ForeignKey, Table } from '../types/schema.types';
+import type {
+  Column,
+  ColumnType,
+  DatabaseSchema,
+  ForeignKey,
+  Table,
+} from '../types/schema';
 
 export function parseSchema(source: string): DatabaseSchema {
   const lines = source.split('\n');

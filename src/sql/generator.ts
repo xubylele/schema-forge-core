@@ -1,4 +1,10 @@
-import { Column, DiffResult, Operation, Table } from '../types/schema.types';
+import type {
+  Column,
+  DiffResult,
+  Operation,
+  Table,
+} from "../types/schema";
+
 
 export function generateSQL(diff: DiffResult): string {
   const statements: string[] = [];

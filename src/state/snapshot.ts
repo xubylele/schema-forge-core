@@ -1,4 +1,9 @@
-import { DatabaseSchema, StateFile, StateTable, StateColumn } from '../types/schema.types';
+import type {
+  DatabaseSchema,
+  StateColumn,
+  StateFile,
+  StateTable,
+} from '../types/schema';
 
 export function createSnapshot(schema: DatabaseSchema): StateFile {
   const tables: Record<string, StateTable> = {};

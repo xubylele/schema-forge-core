@@ -1,11 +1,11 @@
-import {
+import type {
   Column,
   DatabaseSchema,
   DiffResult,
   Operation,
   StateColumn,
   StateFile,
-} from '../types/schema.types';
+} from '../types/schema';
 
 export function getTableNamesFromState(state: StateFile): Set<string> {
   return new Set(Object.keys(state.tables));
