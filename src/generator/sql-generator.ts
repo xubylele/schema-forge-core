@@ -1,5 +1,5 @@
-import type { Column, DiffResult, Operation, Table } from '../types/schema.js';
 import { legacyPkName, legacyUqName, pkName, uqName } from '../core/normalize.js';
+import type { Column, DiffResult, Operation, Table } from '../types/schema.js';
 
 export type Provider = 'supabase' | 'postgres';
 
