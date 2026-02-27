@@ -4,9 +4,9 @@ import type {
   ParsedColumn,
   ParsedConstraint,
   SqlOp
-} from '../../types/sql';
-import { normalizeDefault } from '../normalize';
-import { splitSqlStatements } from './split-statements';
+} from '../../types/sql.js';
+import { normalizeDefault } from '../normalize.js';
+import { splitSqlStatements } from './split-statements.js';
 
 const COLUMN_CONSTRAINT_KEYWORDS = new Set([
   'primary',

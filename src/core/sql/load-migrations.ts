@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { findFiles, readTextFile } from '../fs';
+import { findFiles, readTextFile } from '../fs.js';
 
 export interface MigrationSqlInput {
   filePath: string;

@@ -5,7 +5,7 @@ import type {
   Operation,
   StateColumn,
   StateFile,
-} from '../types/schema';
+} from '../types/schema.js';
 
 export function getTableNamesFromState(state: StateFile): Set<string> {
   return new Set(Object.keys(state.tables));

@@ -4,7 +4,7 @@ import type {
   DatabaseSchema,
   ForeignKey,
   Table,
-} from '../types/schema';
+} from '../types/schema.js';
 
 export function parseSchema(source: string): DatabaseSchema {
   const lines = source.split('\n');

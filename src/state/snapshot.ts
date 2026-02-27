@@ -3,7 +3,7 @@ import type {
   StateColumn,
   StateFile,
   StateTable,
-} from '../types/schema';
+} from '../types/schema.js';
 
 export function createSnapshot(schema: DatabaseSchema): StateFile {
   const tables: Record<string, StateTable> = {};
