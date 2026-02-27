@@ -1,6 +1,6 @@
 {
   "name": "@xubylele/schema-forge-core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Core engine for Schema Forge DSL parsing, diffing and SQL generation",
   "license": "ISC",
   "author": "xubylele <diazxavier27@gmail.com>",
