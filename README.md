@@ -1,28 +1,57 @@
 # Schema Forge Core
 
-schema-forge-core is the core engine for Schema Forge, providing all the logic for parsing, diffing, validating, and generating SQL from schema definitions.
+`@xubylele/schema-forge-core` is the deterministic engine behind Schema Forge. It contains the full domain logic for parsing, diffing, validating, and generating SQL from declarative schema definitions.
 
-It provides pure, deterministic logic for:
+The core is framework-agnostic and built around pure, predictable transformations:
 
-- **Parsing** the .sf DSL format
-- **Diffing** schema versions to detect changes
-- **Validating** schema structures and changes
-- **Generating** SQL migration statements
-- **Importing** from existing SQL migrations
-- **State management** for tracking schema versions
+* **Parse** the `.sf` DSL format
+* **Normalize** schema into a state model
+* **Diff** schema versions to detect structural changes
+* **Validate** schema definitions and destructive changes
+* **Generate** SQL migration statements
+* **Import** and reconstruct schema from existing SQL migrations
 
-This package is **framework agnostic** and can be used in any Node.js or browser environment.
+Same input → same output.
 
 ---
 
 ## Philosophy
 
-- Declarative
-- Deterministic
-- Framework agnostic
-- Pure functional domain layer
+* Declarative schema definition
+* Deterministic transformations
+* Framework agnostic
+* Pure domain layer
+* Explicit state modeling
 
-Same input → same output.
+The core contains no hidden side effects. All structural changes are derived from explicit schema input and state.
+
+---
+
+## Module Boundaries
+
+### Core (Pure)
+
+Environment-agnostic logic:
+
+* Parsing DSL
+* Schema normalization
+* Diff engine
+* Validation rules
+* SQL generation
+* SQL parsing to operations
+* State modeling
+
+These modules can run in Node.js or browser environments.
+
+### Node Utilities (I/O Helpers)
+
+Node-only helpers for CLI or tooling environments:
+
+* File system utilities
+* Project path resolution
+* Migration file loading
+
+These require Node.js.
 
 ---
 
@@ -34,9 +63,9 @@ npm install @xubylele/schema-forge-core
 
 ---
 
-## Usage
+## Basic Usage
 
-### Basic Schema Operations
+### Parse → Diff → Generate SQL
 
 ```ts
 import {
@@ -46,8 +75,7 @@ import {
   generateSql
 } from "@xubylele/schema-forge-core"
 
-// Parse a schema from DSL
-const schema = `
+const schemaSource = `
 table users {
   id uuid pk
   email varchar unique
@@ -55,13 +83,13 @@ table users {
 }
 `
 
-const ast = parseSchema(schema);
+// Parse DSL into schema model
+const schema = parseSchema(schemaSource)
 
-// Convert to state format for diffing
-const state = await schemaToState(ast);
+// Convert schema into normalized state
+const state = await schemaToState(schema)
 
-// Compare with a new version
-const nextSchema = `
+const nextSchemaSource = `
 table users {
   id uuid pk
   email varchar unique
@@ -70,16 +98,21 @@ table users {
 }
 `
 
-const nextAst = parseSchema(nextSchema);
-const diff = diffSchemas(state, nextAst);
+const nextSchema = parseSchema(nextSchemaSource)
 
-// Generate SQL from diff
-const sql = generateSql(diff, 'postgres');
-console.log(sql);
-// Outputs: ALTER TABLE users ADD COLUMN name varchar;
+// Compute structural diff
+const diff = diffSchemas(state, nextSchema)
+
+// Generate SQL for provider
+const sql = generateSql(diff, "postgres")
+
+console.log(sql)
+// ALTER TABLE users ADD COLUMN name varchar;
 ```
 
-### Schema Validation
+---
+
+## Schema Validation
 
 ```ts
 import {
@@ -88,30 +121,27 @@ import {
   toValidationReport
 } from "@xubylele/schema-forge-core"
 
-// Validate schema structure (throws on failure)
-const schema = parseSchema(schemaSource);
-try {
-  validateSchema(schema);
-} catch (error) {
-  console.error('Invalid schema:', error);
-}
+const schema = parseSchema(schemaSource)
 
-// Validate schema changes for destructive operations
-const state = await loadState('./state.json');
-const nextSchema = parseSchema(newSchemaSource);
-const findings = validateSchemaChanges(state, nextSchema);
-const report = toValidationReport(findings);
+// Structural validation (throws on invalid schema)
+validateSchema(schema)
 
-report.errors.forEach(finding => {
-  console.log(`[error] ${finding.code}: ${finding.message}`);
-});
+// Destructive change validation
+const findings = validateSchemaChanges(state, nextSchema)
+const report = toValidationReport(findings)
 
-report.warnings.forEach(finding => {
-  console.log(`[warning] ${finding.code}: ${finding.message}`);
-});
+report.errors.forEach(f => {
+  console.error(`[error] ${f.code}: ${f.message}`)
+})
+
+report.warnings.forEach(f => {
+  console.warn(`[warning] ${f.code}: ${f.message}`)
+})
 ```
 
-### SQL Import
+---
+
+## SQL Import (Reverse Engineering)
 
 ```ts
 import {
@@ -121,94 +151,75 @@ import {
   schemaToDsl
 } from "@xubylele/schema-forge-core"
 
-// Load SQL from file or directory
-const inputs = await loadMigrationSqlInput('./migrations');
+const inputs = await loadMigrationSqlInput("./migrations")
 
 for (const input of inputs) {
-  // Parse SQL to operations
-  const parseResult = parseMigrationSql(input.sql);
+  const parseResult = parseMigrationSql(input.sql)
 
   if (parseResult.warnings.length > 0) {
-    console.warn('Parse warnings:', parseResult.warnings);
+    console.warn(parseResult.warnings)
   }
 
-  // Apply operations to build schema
-  const result = applySqlOps(parseResult.ops);
+  const result = applySqlOps(parseResult.ops)
+  const dsl = schemaToDsl(result.schema)
 
-  // Convert back to DSL
-  const dsl = schemaToDsl(result.schema);
-  console.log(dsl);
+  console.log(dsl)
 }
-```
-
-### File System Utilities
-
-```ts
-import { 
-  readTextFile, 
-  writeTextFile,
-  readJsonFile,
-  writeJsonFile,
-  findFiles
-} from "@xubylele/schema-forge-core"
-
-// Read/write text files
-const content = await readTextFile('./schema.sf');
-await writeTextFile('./output.sf', dslOutput);
-
-// Read/write JSON
-const state = await readJsonFile('./state.json');
-await writeJsonFile('./state.json', newState);
-
-// Find files matching pattern
-const files = await findFiles('./migrations', /\.sql$/);
 ```
 
 ---
 
-## API Reference
+## Supported Providers
 
-### Core Functions
+* `postgres`
 
-- `parseSchema(source: string): DatabaseSchema` - Parse DSL to schema AST
-- `diffSchemas(state: StateFile, schema: DatabaseSchema): DiffResult` - Compute changes between versions
-- `getTableNamesFromState(state: StateFile): Set<string>` - List tables from a persisted state
-- `getTableNamesFromSchema(schema: DatabaseSchema): Set<string>` - List tables from a schema
-- `getColumnNamesFromState(stateColumns: Record<string, StateColumn>): Set<string>` - List columns from a state table
-- `getColumnNamesFromSchema(columns: Column[]): Set<string>` - List columns from a schema table
-- `validateSchema(schema: DatabaseSchema): void` - Validate schema structure (throws on failure)
-- `validateSchemaChanges(state: StateFile, schema: DatabaseSchema): Finding[]` - Detect destructive changes
-- `toValidationReport(findings: Finding[]): ValidationReport` - Split findings into error/warning buckets
-- `generateSql(diff: DiffResult, provider: Provider, config?: SqlConfig): string` - Generate SQL from diff
+Additional providers may be implemented in higher-level packages.
 
-### State Management
+---
 
-- `schemaToState(schema: DatabaseSchema): Promise<StateFile>` - Convert schema to state format
-- `loadState(filePath: string): Promise<StateFile>` - Load state from JSON file (fallbacks to empty)
-- `saveState(filePath: string, state: StateFile): Promise<void>` - Save state to JSON file
+## Core API (High-Level)
 
-### SQL Parsing & Import
+### Parsing & State
 
-- `parseMigrationSql(sql: string): ParseResult` - Parse SQL to operations and warnings
-- `parseCreateTable(statement: string): SqlOp | null` - Parse a CREATE TABLE statement
-- `parseAlterTableAddColumn(statement: string): SqlOp | null` - Parse an ALTER TABLE ADD COLUMN statement
-- `parseAlterColumnType(statement: string): SqlOp | null` - Parse an ALTER TABLE ALTER COLUMN TYPE statement
-- `parseSetDropNotNull(statement: string): SqlOp | null` - Parse SET/DROP NOT NULL statements
-- `parseSetDropDefault(statement: string): SqlOp | null` - Parse SET/DROP DEFAULT statements
-- `parseAddDropConstraint(statement: string): SqlOp | null` - Parse ADD/DROP CONSTRAINT statements
-- `parseDropColumn(statement: string): SqlOp | null` - Parse a DROP COLUMN statement
-- `parseDropTable(statement: string): SqlOp | null` - Parse a DROP TABLE statement
-- `applySqlOps(ops: SqlOp[]): ApplySqlOpsResult` - Build schema from SQL operations
-- `schemaToDsl(schema: DatabaseSchema): string` - Convert schema back to DSL format
-- `loadMigrationSqlInput(pathInput: string): Promise<MigrationSqlInput[]>` - Load SQL from file/directory
-- `splitSqlStatements(sql: string): string[]` - Split SQL into individual statements
+* `parseSchema(source: string): DatabaseSchema`
+* `schemaToState(schema: DatabaseSchema): Promise<StateFile>`
+* `loadState(filePath: string): Promise<StateFile>`
+* `saveState(filePath: string, state: StateFile): Promise<void>`
 
-### Utilities
+### Diff Engine
 
-- **File System**: `ensureDir`, `fileExists`, `readTextFile`, `writeTextFile`, `readJsonFile`, `writeJsonFile`, `findFiles`
-- **Normalization**: `normalizeIdent`, `pkName`, `uqName`, `legacyPkName`, `legacyUqName`, `normalizeDefault`
-- **Paths**: `getProjectRoot`, `getSchemaForgeDir`, `getSchemaFilePath`, `getConfigPath`, `getStatePath`
-- **General**: `nowTimestamp`, `slugifyName`
+* `diffSchemas(state: StateFile, schema: DatabaseSchema): DiffResult`
+
+### Validation
+
+* `validateSchema(schema: DatabaseSchema): void`
+* `validateSchemaChanges(state: StateFile, schema: DatabaseSchema): Finding[]`
+* `toValidationReport(findings: Finding[]): ValidationReport`
+
+### SQL Generation
+
+* `generateSql(diff: DiffResult, provider: Provider, config?: SqlConfig): string`
+
+### SQL Parsing & Reconstruction
+
+* `parseMigrationSql(sql: string): ParseResult`
+* `applySqlOps(ops: SqlOp[]): ApplySqlOpsResult`
+* `schemaToDsl(schema: DatabaseSchema): string`
+
+Full API surface is available via TypeScript exports.
+
+---
+
+## Type Exports
+
+All domain types are exported for integration:
+
+* `DatabaseSchema`, `Table`, `Column`, `ForeignKey`
+* `StateFile`, `StateTable`, `StateColumn`
+* `DiffResult`, `Operation`
+* `SqlOp`, `ParseResult`, `ApplySqlOpsResult`
+* `Finding`, `ValidationReport`, `Severity`
+* `Provider`, `SqlConfig`
 
 ---
 
@@ -216,28 +227,15 @@ const files = await findFiles('./migrations', /\.sql$/);
 
 ```
 DSL (.sf)
-  |
-Parser -> AST (DatabaseSchema)
-  |
-State Manager -> Normalized State
-  |
-Diff Engine -> Operations
-  |
-SQL Generator -> Migration SQL
+  ↓
+Parser → DatabaseSchema
+  ↓
+State Normalization → StateFile
+  ↓
+Diff Engine → Operations
+  ↓
+SQL Generator → Migration SQL
 ```
-
----
-
-## Type Definitions
-
-All TypeScript types are exported for use in your application:
-
-- `DatabaseSchema`, `Table`, `Column`, `ColumnType`, `ForeignKey`
-- `StateFile`, `StateTable`, `StateColumn`
-- `Operation`, `DiffResult`
-- `SqlOp`, `ParsedColumn`, `ParsedConstraint`, `ParseWarning`, `ParseResult`, `ApplySqlOpsResult`
-- `Finding`, `ValidationReport`, `Severity`
-- `Provider`, `SqlConfig`
 
 ---
 
