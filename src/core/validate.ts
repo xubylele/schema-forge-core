@@ -1,5 +1,5 @@
-import type { DatabaseSchema, StateFile } from '../types/schema';
-import { diffSchemas } from './diff';
+import type { DatabaseSchema, StateFile } from '../types/schema.js';
+import { diffSchemas } from './diff.js';
 
 export type Severity = 'error' | 'warning';
 

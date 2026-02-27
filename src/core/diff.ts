@@ -5,8 +5,8 @@ import type {
   Operation,
   StateColumn,
   StateFile,
-} from '../types/schema';
-import { normalizeDefault } from './normalize';
+} from '../types/schema.js';
+import { normalizeDefault } from './normalize.js';
 
 /**
  * Extract table names from a stored state file.

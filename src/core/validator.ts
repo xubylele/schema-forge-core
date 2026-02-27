@@ -1,4 +1,4 @@
-import type { DatabaseSchema, ColumnType, Column, Table } from '../types/schema';
+import type { ColumnType, DatabaseSchema, Table } from '../types/schema.js';
 
 /**
  * Valid column types for the database

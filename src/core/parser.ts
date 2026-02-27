@@ -1,4 +1,4 @@
-import type { Column, ColumnType, DatabaseSchema, ForeignKey } from '../types/schema';
+import type { Column, ColumnType, DatabaseSchema, ForeignKey } from '../types/schema.js';
 
 /**
  * Parse a schema from DSL source string
