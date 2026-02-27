@@ -1,9 +1,9 @@
 {
   "name": "@xubylele/schema-forge-core",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Core engine for Schema Forge DSL parsing, diffing and SQL generation",
   "license": "ISC",
-  "author": "Xuby <diazxavier27@gmail.com>",
+  "author": "xubylele <diazxavier27@gmail.com>",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,6 +16,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
