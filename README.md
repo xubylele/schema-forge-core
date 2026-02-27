@@ -82,52 +82,63 @@ console.log(sql);
 ### Schema Validation
 
 ```ts
-import { validateSchema, validateSchemaChanges } from "@xubylele/schema-forge-core"
+import {
+  validateSchema,
+  validateSchemaChanges,
+  toValidationReport
+} from "@xubylele/schema-forge-core"
 
-// Validate schema structure
+// Validate schema structure (throws on failure)
 const schema = parseSchema(schemaSource);
-const structureErrors = validateSchema(schema);
-
-if (structureErrors.length > 0) {
-  console.error('Invalid schema:', structureErrors);
+try {
+  validateSchema(schema);
+} catch (error) {
+  console.error('Invalid schema:', error);
 }
 
 // Validate schema changes for destructive operations
 const state = await loadState('./state.json');
 const nextSchema = parseSchema(newSchemaSource);
 const findings = validateSchemaChanges(state, nextSchema);
+const report = toValidationReport(findings);
 
-findings.forEach(finding => {
-  console.log(`[${finding.severity}] ${finding.code}: ${finding.message}`);
+report.errors.forEach(finding => {
+  console.log(`[error] ${finding.code}: ${finding.message}`);
+});
+
+report.warnings.forEach(finding => {
+  console.log(`[warning] ${finding.code}: ${finding.message}`);
 });
 ```
 
 ### SQL Import
 
 ```ts
-import { 
-  loadMigrationSqlInput, 
-  parseMigrationSql, 
+import {
+  loadMigrationSqlInput,
+  parseMigrationSql,
   applySqlOps,
-  schemaToDsl 
+  schemaToDsl
 } from "@xubylele/schema-forge-core"
 
 // Load SQL from file or directory
-const input = await loadMigrationSqlInput('./migrations');
+const inputs = await loadMigrationSqlInput('./migrations');
 
-// Parse SQL to operations
-const parseResult = parseMigrationSql(input.sql);
+for (const input of inputs) {
+  // Parse SQL to operations
+  const parseResult = parseMigrationSql(input.sql);
 
-if (parseResult.warnings.length > 0) {
-  console.warn('Parse warnings:', parseResult.warnings);
+  if (parseResult.warnings.length > 0) {
+    console.warn('Parse warnings:', parseResult.warnings);
+  }
+
+  // Apply operations to build schema
+  const result = applySqlOps(parseResult.ops);
+
+  // Convert back to DSL
+  const dsl = schemaToDsl(result.schema);
+  console.log(dsl);
 }
-
-// Apply operations to build schema
-const result = applySqlOps(parseResult.operations);
-
-// Convert back to DSL
-const dsl = schemaToDsl(result.schema);
-console.log(dsl);
 ```
 
 ### File System Utilities
@@ -161,22 +172,35 @@ const files = await findFiles('./migrations', /\.sql$/);
 
 - `parseSchema(source: string): DatabaseSchema` - Parse DSL to schema AST
 - `diffSchemas(state: StateFile, schema: DatabaseSchema): DiffResult` - Compute changes between versions
-- `validateSchema(schema: DatabaseSchema): string[]` - Validate schema structure
+- `getTableNamesFromState(state: StateFile): Set<string>` - List tables from a persisted state
+- `getTableNamesFromSchema(schema: DatabaseSchema): Set<string>` - List tables from a schema
+- `getColumnNamesFromState(stateColumns: Record<string, StateColumn>): Set<string>` - List columns from a state table
+- `getColumnNamesFromSchema(columns: Column[]): Set<string>` - List columns from a schema table
+- `validateSchema(schema: DatabaseSchema): void` - Validate schema structure (throws on failure)
 - `validateSchemaChanges(state: StateFile, schema: DatabaseSchema): Finding[]` - Detect destructive changes
+- `toValidationReport(findings: Finding[]): ValidationReport` - Split findings into error/warning buckets
 - `generateSql(diff: DiffResult, provider: Provider, config?: SqlConfig): string` - Generate SQL from diff
 
 ### State Management
 
 - `schemaToState(schema: DatabaseSchema): Promise<StateFile>` - Convert schema to state format
-- `loadState(filePath: string): Promise<StateFile>` - Load state from JSON file
+- `loadState(filePath: string): Promise<StateFile>` - Load state from JSON file (fallbacks to empty)
 - `saveState(filePath: string, state: StateFile): Promise<void>` - Save state to JSON file
 
 ### SQL Parsing & Import
 
-- `parseMigrationSql(sql: string): ParseResult` - Parse SQL to operations
-- `applySqlOps(operations: SqlOp[]): ApplySqlOpsResult` - Build schema from SQL operations
+- `parseMigrationSql(sql: string): ParseResult` - Parse SQL to operations and warnings
+- `parseCreateTable(statement: string): SqlOp | null` - Parse a CREATE TABLE statement
+- `parseAlterTableAddColumn(statement: string): SqlOp | null` - Parse an ALTER TABLE ADD COLUMN statement
+- `parseAlterColumnType(statement: string): SqlOp | null` - Parse an ALTER TABLE ALTER COLUMN TYPE statement
+- `parseSetDropNotNull(statement: string): SqlOp | null` - Parse SET/DROP NOT NULL statements
+- `parseSetDropDefault(statement: string): SqlOp | null` - Parse SET/DROP DEFAULT statements
+- `parseAddDropConstraint(statement: string): SqlOp | null` - Parse ADD/DROP CONSTRAINT statements
+- `parseDropColumn(statement: string): SqlOp | null` - Parse a DROP COLUMN statement
+- `parseDropTable(statement: string): SqlOp | null` - Parse a DROP TABLE statement
+- `applySqlOps(ops: SqlOp[]): ApplySqlOpsResult` - Build schema from SQL operations
 - `schemaToDsl(schema: DatabaseSchema): string` - Convert schema back to DSL format
-- `loadMigrationSqlInput(pathInput: string): Promise<MigrationSqlInput>` - Load SQL from file/directory
+- `loadMigrationSqlInput(pathInput: string): Promise<MigrationSqlInput[]>` - Load SQL from file/directory
 - `splitSqlStatements(sql: string): string[]` - Split SQL into individual statements
 
 ### Utilities
@@ -192,14 +216,14 @@ const files = await findFiles('./migrations', /\.sql$/);
 
 ```
 DSL (.sf)
-   ↓
-Parser → AST (DatabaseSchema)
-   ↓
-State Manager → Normalized State
-   ↓
-Diff Engine → Operations
-   ↓
-SQL Generator → Migration SQL
+  |
+Parser -> AST (DatabaseSchema)
+  |
+State Manager -> Normalized State
+  |
+Diff Engine -> Operations
+  |
+SQL Generator -> Migration SQL
 ```
 
 ---
@@ -211,7 +235,7 @@ All TypeScript types are exported for use in your application:
 - `DatabaseSchema`, `Table`, `Column`, `ColumnType`, `ForeignKey`
 - `StateFile`, `StateTable`, `StateColumn`
 - `Operation`, `DiffResult`
-- `SqlOp`, `ParsedColumn`, `ParsedConstraint`, `ParseResult`, `ApplySqlOpsResult`
+- `SqlOp`, `ParsedColumn`, `ParsedConstraint`, `ParseWarning`, `ParseResult`, `ApplySqlOpsResult`
 - `Finding`, `ValidationReport`, `Severity`
 - `Provider`, `SqlConfig`
 
