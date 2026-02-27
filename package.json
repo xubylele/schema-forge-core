@@ -1,9 +1,13 @@
 {
   "name": "@xubylele/schema-forge-core",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Core engine for Schema Forge DSL parsing, diffing and SQL generation",
   "license": "ISC",
   "author": "xubylele <diazxavier27@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xubylele/schema-forge-core.git"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

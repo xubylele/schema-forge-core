@@ -1,7 +1,7 @@
 name: Release on Main
 
 on:
-  push:
+  pull_request:
     branches:
       - main
 
