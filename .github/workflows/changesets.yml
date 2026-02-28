@@ -1,0 +1,30 @@
+name: Changesets Check
+
+on:
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  check:
+    name: Check pending changesets
+    runs-on: ubuntu-latest
+    if: ${{ github.head_ref != 'main' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate pending changesets
+        run: npx changeset status --since=origin/pre-release
