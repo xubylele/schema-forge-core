@@ -38,5 +38,16 @@ export { nowTimestamp, slugifyName } from './core/utils.js';
 export { SchemaValidationError } from './core/errors.js';
 
 // Types
-export type * from './types/schema.js';
+export type {
+	ColumnType,
+	ForeignKey,
+	Column,
+	Table,
+	DatabaseSchema,
+	StateColumn,
+	StateTable,
+	StateFile,
+	Operation,
+	DiffResult,
+} from './types/schema.js';
 export type { SqlOp, ParsedColumn, ParsedConstraint, ParseWarning, ParseResult, ApplySqlOpsResult } from './types/sql.js';
