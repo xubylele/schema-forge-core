@@ -27,4 +27,12 @@ jobs:
         run: npm ci
 
       - name: Validate pending changesets
-        run: npx changeset status --since=origin/pre-release
+        run: |
+          output=$(npx changeset status --since=origin/${{ github.base_ref }} --verbose)
+          echo "$output"
+          if echo "$output" | grep -qE "(major|minor|patch)"; then
+            exit 0
+          else
+            echo "No version bump found in changesets"
+            exit 1
+          fi

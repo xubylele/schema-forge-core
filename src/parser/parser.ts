@@ -43,6 +43,25 @@ export function parseSchema(source: string): DatabaseSchema {
     };
   }
 
+  function validateDefaultValue(value: string, lineNum: number): void {
+    // Check for unmatched parentheses in function calls
+    const openCount = (value.match(/\(/g) || []).length;
+    const closeCount = (value.match(/\)/g) || []).length;
+
+    if (openCount !== closeCount) {
+      throw new Error(
+        `Line ${lineNum}: Invalid default value '${value}'. Unmatched parentheses in function call.`
+      );
+    }
+
+    // Check for incomplete function calls (ends with open paren)
+    if (value.endsWith('(')) {
+      throw new Error(
+        `Line ${lineNum}: Invalid default value '${value}'. Function call is missing closing parenthesis.`
+      );
+    }
+  }
+
   function parseColumn(line: string, lineNum: number): Column {
     const tokens = line.split(/\s+/).filter(t => t.length > 0);
 
@@ -91,7 +110,9 @@ export function parseSchema(source: string): DatabaseSchema {
           if (i >= tokens.length) {
             throw new Error(`Line ${lineNum}: 'default' modifier requires a value`);
           }
-          column.default = tokens[i];
+          const defaultValue = tokens[i];
+          validateDefaultValue(defaultValue, lineNum);
+          column.default = defaultValue;
           i++;
           break;
 
