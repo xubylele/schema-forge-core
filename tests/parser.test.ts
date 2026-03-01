@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { parseSchema } from '../src/core/parser';
 
 describe('parseSchema', () => {
@@ -190,6 +190,30 @@ describe('parseSchema', () => {
     expect(result.tables.users.columns).toHaveLength(2);
   });
 
+  it('should keep # inside default string values', () => {
+    const source = `
+      table users {
+        note text default 'ticket#123'
+      }
+    `;
+
+    const result = parseSchema(source);
+
+    expect(result.tables.users.columns[0].default).toBe("'ticket#123'");
+  });
+
+  it('should keep // inside default string values', () => {
+    const source = `
+      table users {
+        url text default 'https://example.com'
+      }
+    `;
+
+    const result = parseSchema(source);
+
+    expect(result.tables.users.columns[0].default).toBe("'https://example.com'");
+  });
+
   it('should parse multiple tables', () => {
     const source = `
       table users {
@@ -303,6 +327,26 @@ describe('parseSchema', () => {
     expect(() => parseSchema(source)).toThrow(/Invalid column type 'invalid_type'/);
   });
 
+  it('should throw error on varchar with non-positive length', () => {
+    const source = `
+      table users {
+        name varchar(0)
+      }
+    `;
+
+    expect(() => parseSchema(source)).toThrow(/Invalid column type 'varchar\(0\)'/);
+  });
+
+  it('should throw error on numeric where scale is larger than precision', () => {
+    const source = `
+      table prices {
+        amount numeric(2,3)
+      }
+    `;
+
+    expect(() => parseSchema(source)).toThrow(/Invalid column type 'numeric\(2,3\)'/);
+  });
+
   it('should throw error on missing closing brace', () => {
     const source = `
       table users {
@@ -310,6 +354,16 @@ describe('parseSchema', () => {
     `;
 
     expect(() => parseSchema(source)).toThrow(/not closed/);
+  });
+
+  it('should throw error when table opening brace is missing', () => {
+    const source = `
+      table users
+        id uuid
+      }
+    `;
+
+    expect(() => parseSchema(source)).toThrow(/Invalid table definition/);
   });
 
   it('should throw error on invalid foreign key format', () => {
@@ -485,5 +539,90 @@ describe('parseSchema', () => {
     // created_at with default
     const createdAtCol = result.tables.users.columns.find(c => c.name === 'created_at');
     expect(createdAtCol?.default).toBe('now()');
+  });
+
+  // Syntax error tests for default values
+  it('should throw error on incomplete function call - missing closing parenthesis', () => {
+    const source = `
+      table users {
+        id uuid
+        updated_at timestamptz default now(
+      }
+    `;
+
+    expect(() => parseSchema(source)).toThrow(/Function call is missing closing parenthesis/);
+  });
+
+  it('should throw error on mismatched parentheses in default value', () => {
+    const source = `
+      table users {
+        id uuid
+        value text default some_func((
+      }
+    `;
+
+    expect(() => parseSchema(source)).toThrow(/Unmatched parentheses in function call/);
+  });
+
+  it('should throw error on extra closing parenthesis in default value', () => {
+    const source = `
+      table users {
+        id uuid
+        value text default func())
+      }
+    `;
+
+    expect(() => parseSchema(source)).toThrow(/Unmatched parentheses in function call/);
+  });
+
+  it('should allow valid function calls with matching parentheses', () => {
+    const source = `
+      table users {
+        id uuid default gen_random_uuid()
+        created_at timestamptz default now()
+      }
+    `;
+
+    const result = parseSchema(source);
+    expect(result.tables.users.columns[0].default).toBe('gen_random_uuid()');
+    expect(result.tables.users.columns[1].default).toBe('now()');
+  });
+
+  it('should allow simple literal default values', () => {
+    const source = `
+      table users {
+        active boolean default true
+        count int default 0
+        name text default 'unknown'
+      }
+    `;
+
+    const result = parseSchema(source);
+    expect(result.tables.users.columns[0].default).toBe('true');
+    expect(result.tables.users.columns[1].default).toBe('0');
+    expect(result.tables.users.columns[2].default).toBe("'unknown'");
+  });
+
+  it('should throw error on nested mismatched parentheses', () => {
+    const source = `
+      table users {
+        id uuid
+        value text default func(nested(arg)
+      }
+    `;
+
+    expect(() => parseSchema(source)).toThrow(/Function call is missing closing parenthesis/);
+  });
+
+  it('should handle multiple columns with one having invalid default', () => {
+    const source = `
+      table users {
+        id uuid default gen_random_uuid()
+        email varchar
+        updated_at timestamptz default now(
+      }
+    `;
+
+    expect(() => parseSchema(source)).toThrow(/Function call is missing closing parenthesis/);
   });
 });
