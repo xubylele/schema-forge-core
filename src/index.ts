@@ -7,6 +7,10 @@ export { validateSchema } from './core/validator.js';
 export { validateSchemaChanges, toValidationReport } from './core/validate.js';
 export type { Finding, ValidationReport, Severity } from './core/validate.js';
 
+// Safety middleware layer (centralized destructive operation handling)
+export { classifyOperation, checkOperationSafety, checkSchemaSafety } from './core/safety/index.js';
+export type { SafetyLevel, Finding as SafeFinding, SafetyReport, DestructiveOperationCode } from './core/safety/index.js';
+
 // State management
 export { schemaToState, loadState, saveState } from './core/state-manager.js';
 
