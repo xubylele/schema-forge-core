@@ -8,7 +8,8 @@ export type ColumnType =
   | `numeric(${number},${number})`
   | 'boolean'
   | 'timestamptz'
-  | 'date';
+  | 'date'
+  | (string & {});
 
 export interface ForeignKey {
   table: string;
