@@ -45,3 +45,65 @@ export interface ApplySqlOpsResult {
   schema: DatabaseSchema | { tables: Record<string, { name: string; columns: Column[]; primaryKey?: string | null }> };
   warnings: ParseWarning[];
 }
+
+export type PostgresQueryExecutor = <TRow extends object>(
+  sql: string,
+  params?: readonly unknown[]
+) => Promise<TRow[]>;
+
+export interface PostgresIntrospectionOptions {
+  query: PostgresQueryExecutor;
+  schemas?: string[];
+}
+
+export interface PostgresIntrospectionTableRow {
+  table_schema: string;
+  table_name: string;
+}
+
+export interface PostgresIntrospectionColumnRow {
+  table_schema: string;
+  table_name: string;
+  column_name: string;
+  ordinal_position: number;
+  is_nullable: 'YES' | 'NO';
+  data_type: string;
+  udt_name: string;
+  character_maximum_length: number | null;
+  numeric_precision: number | null;
+  numeric_scale: number | null;
+  column_default: string | null;
+}
+
+export interface PostgresIntrospectionConstraintRow {
+  table_schema: string;
+  table_name: string;
+  constraint_name: string;
+  constraint_type: 'PRIMARY KEY' | 'UNIQUE' | 'CHECK';
+  column_name: string | null;
+  ordinal_position: number | null;
+  check_clause: string | null;
+}
+
+export interface PostgresIntrospectionForeignKeyRow {
+  table_schema: string;
+  table_name: string;
+  constraint_name: string;
+  local_column_name: string;
+  referenced_table_schema: string;
+  referenced_table_name: string;
+  referenced_column_name: string;
+  position: number;
+}
+
+export interface NormalizedPostgresConstraint {
+  tableSchema: string;
+  tableName: string;
+  name: string;
+  type: 'PRIMARY KEY' | 'UNIQUE' | 'FOREIGN KEY' | 'CHECK';
+  columns: string[];
+  referencedTableSchema?: string;
+  referencedTableName?: string;
+  referencedColumns?: string[];
+  checkClause?: string;
+}
