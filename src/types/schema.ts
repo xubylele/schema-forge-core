@@ -55,6 +55,26 @@ export interface StateFile {
   tables: Record<string, StateTable>;
 }
 
+export interface DriftColumnDifference {
+  tableName: string;
+  missingInLive: string[];
+  extraInLive: string[];
+}
+
+export interface DriftTypeMismatch {
+  tableName: string;
+  columnName: string;
+  expectedType: ColumnType;
+  actualType: ColumnType;
+}
+
+export interface DriftReport {
+  missingTables: string[];
+  extraTables: string[];
+  columnDifferences: DriftColumnDifference[];
+  typeMismatches: DriftTypeMismatch[];
+}
+
 export type Operation =
   | { kind: 'create_table'; table: Table }
   | { kind: 'drop_table'; tableName: string }

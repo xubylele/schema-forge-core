@@ -3,6 +3,7 @@ export { parseSchema } from './core/parser.js';
 
 // Diff and validation
 export { diffSchemas, getTableNamesFromState, getTableNamesFromSchema, getColumnNamesFromState, getColumnNamesFromSchema } from './core/diff.js';
+export { analyzeSchemaDrift } from './core/drift-analyzer.js';
 export { validateSchema } from './core/validator.js';
 export { validateSchemaChanges, toValidationReport } from './core/validate.js';
 export type { Finding, ValidationReport, Severity } from './core/validate.js';
@@ -25,6 +26,7 @@ export { schemaToDsl } from './core/sql/schema-to-dsl.js';
 export { loadMigrationSqlInput } from './core/sql/load-migrations.js';
 export type { MigrationSqlInput } from './core/sql/load-migrations.js';
 export { splitSqlStatements } from './core/sql/split-statements.js';
+export { introspectPostgresSchema } from './core/sql/introspect-postgres.js';
 
 // File system utilities
 export { ensureDir, fileExists, readTextFile, writeTextFile, readJsonFile, writeJsonFile, findFiles } from './core/fs.js';
@@ -51,7 +53,24 @@ export type {
 	StateColumn,
 	StateTable,
 	StateFile,
+	DriftColumnDifference,
+	DriftTypeMismatch,
+	DriftReport,
 	Operation,
 	DiffResult,
 } from './types/schema.js';
-export type { SqlOp, ParsedColumn, ParsedConstraint, ParseWarning, ParseResult, ApplySqlOpsResult } from './types/sql.js';
+export type {
+	SqlOp,
+	ParsedColumn,
+	ParsedConstraint,
+	ParseWarning,
+	ParseResult,
+	ApplySqlOpsResult,
+	PostgresQueryExecutor,
+	PostgresIntrospectionOptions,
+	PostgresIntrospectionTableRow,
+	PostgresIntrospectionColumnRow,
+	PostgresIntrospectionConstraintRow,
+	PostgresIntrospectionForeignKeyRow,
+	NormalizedPostgresConstraint,
+} from './types/sql.js';
