@@ -17,6 +17,16 @@ Same input → same output.
 
 ---
 
+## What's New (v1.3.0)
+
+* Added `analyzeSchemaDrift(state, liveSchema)` to compare live database schemas against `state.json`.
+* Added PostgreSQL schema introspection with typed metadata for tables, columns, and constraints.
+* Expanded exports and tests for deterministic behavior and safer integration usage.
+
+See full details in the [changelog](./CHANGELOG.md).
+
+---
+
 ## Philosophy
 
 * Declarative schema definition

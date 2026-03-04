@@ -1,5 +1,23 @@
 # @xubylele/schema-forge-core
 
+## 1.3.0
+
+### Minor Changes
+
+- 8bd20d7: feat(drift): add schema drift analyzer against state snapshots
+
+  - Added `analyzeSchemaDrift(state, liveSchema)` to compare live DB schemas with `state.json`.
+  - Added structured `DriftReport` output for missing tables, extra tables, column differences, and type mismatches.
+  - Exported drift analyzer APIs and added focused tests for acceptance criteria and deterministic ordering.
+
+- 8bd20d7: ✨ feat(postgres): add PostgreSQL schema introspection functionality
+
+  - Introduced a dedicated module for PostgreSQL schema introspection.
+  - Implemented metadata extraction for tables, columns, and constraints.
+  - Added strongly typed introspection result interfaces for improved type safety.
+  - Exposed the new introspection function through the main module export.
+  - Added unit tests to validate metadata mapping and ensure accurate schema representation.
+
 ## 1.2.0
 
 ### Minor Changes
