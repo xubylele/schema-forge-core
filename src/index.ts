@@ -3,6 +3,7 @@ export { parseSchema } from './core/parser.js';
 
 // Diff and validation
 export { diffSchemas, getTableNamesFromState, getTableNamesFromSchema, getColumnNamesFromState, getColumnNamesFromSchema } from './core/diff.js';
+export { analyzeSchemaDrift } from './core/drift-analyzer.js';
 export { validateSchema } from './core/validator.js';
 export { validateSchemaChanges, toValidationReport } from './core/validate.js';
 export type { Finding, ValidationReport, Severity } from './core/validate.js';
@@ -52,6 +53,9 @@ export type {
 	StateColumn,
 	StateTable,
 	StateFile,
+	DriftColumnDifference,
+	DriftTypeMismatch,
+	DriftReport,
 	Operation,
 	DiffResult,
 } from './types/schema.js';
