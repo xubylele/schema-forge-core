@@ -15,6 +15,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./browser": {
+      "import": "./dist/browser.js",
+      "types": "./dist/browser.d.ts"
     }
   },
   "files": [
@@ -24,13 +28,15 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run build:browser",
+    "build:browser": "tsup --config tsup.browser.config.ts",
     "test": "vitest run",
     "dev": "tsc -w"
   },
   "devDependencies": {
     "@changesets/cli": "^2.29.8",
     "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
     "typescript": "^5.0.0",
     "vitest": "^4.0.18"
   }
