@@ -1,5 +1,14 @@
 # @xubylele/schema-forge-core
 
+## 1.3.2
+
+### Patch Changes
+
+- 00320c0: 📝 docs: add homepage metadata and update website links
+
+  - Add `homepage` field to `package.json` for better project visibility.
+  - Update `README.md` to include the new website link alongside the npm package reference.
+
 ## 1.3.1
 
 ### Patch Changes
