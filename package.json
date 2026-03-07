@@ -8,6 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/xubylele/schema-forge-core.git"
   },
+  "homepage": "https://schemaforge.xuby.cl/",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

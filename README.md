@@ -1,6 +1,6 @@
 # Schema Forge Core
 
-**npm package:** [@xubylele/schema-forge-core](https://www.npmjs.com/package/@xubylele/schema-forge-core)
+**Website:** [schemaforge.xuby.cl](https://schemaforge.xuby.cl/) · **npm package:** [@xubylele/schema-forge-core](https://www.npmjs.com/package/@xubylele/schema-forge-core)
 
 `@xubylele/schema-forge-core` is the deterministic engine behind Schema Forge. It contains the full domain logic for parsing, diffing, validating, and generating SQL from declarative schema definitions.
 
