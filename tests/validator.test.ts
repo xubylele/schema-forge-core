@@ -302,4 +302,171 @@ describe('validateSchema', () => {
       "Table 'users': primary key column 'user_id' does not exist"
     );
   });
+
+  describe('policy validation', () => {
+    it('should not throw for valid schema with policies (using and withCheck)', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'uuid', primaryKey: true },
+              { name: 'email', type: 'text' },
+            ],
+            policies: [
+              {
+                name: 'Users can read themselves',
+                table: 'users',
+                command: 'select',
+                using: 'auth.uid() = id',
+              },
+              {
+                name: 'Users can update themselves',
+                table: 'users',
+                command: 'update',
+                using: 'auth.uid() = id',
+                withCheck: 'auth.uid() = id',
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).not.toThrow();
+    });
+
+    it('should not throw for valid policy with only using', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            policies: [
+              {
+                name: 'Select policy',
+                table: 'users',
+                command: 'select',
+                using: 'true',
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).not.toThrow();
+    });
+
+    it('should not throw for valid policy with only withCheck', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            policies: [
+              {
+                name: 'Insert policy',
+                table: 'users',
+                command: 'insert',
+                withCheck: 'true',
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).not.toThrow();
+    });
+
+    it('should throw when policy references undefined table', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            policies: [
+              {
+                name: 'Bad policy',
+                table: 'nonexistent_table',
+                command: 'select',
+                using: 'true',
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).toThrow(
+        'Policy "Bad policy" on table "users": referenced table "nonexistent_table" does not exist'
+      );
+    });
+
+    it('should throw when policy has invalid command', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            policies: [
+              {
+                name: 'Bad policy',
+                table: 'users',
+                command: 'invalid' as any,
+                using: 'true',
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).toThrow(
+        'Policy "Bad policy" on table "users": invalid command "invalid". Expected: select, insert, update, or delete'
+      );
+    });
+
+    it('should throw when policy has no using or withCheck', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            policies: [
+              {
+                name: 'Empty policy',
+                table: 'users',
+                command: 'select',
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).toThrow(
+        'Policy "Empty policy" on table "users": must have at least one of "using" or "with check"'
+      );
+    });
+
+    it('should throw when policy has empty using and empty withCheck', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            policies: [
+              {
+                name: 'Empty expressions',
+                table: 'users',
+                command: 'select',
+                using: '   ',
+                withCheck: '',
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).toThrow(
+        'Policy "Empty expressions" on table "users": must have at least one of "using" or "with check"'
+      );
+    });
+  });
 });
