@@ -4,8 +4,12 @@
  */
 
 import type { DatabaseSchema, StateFile } from '../types/schema.js';
+import type {
+  DestructiveOperationCode,
+  Finding as SafeFinding,
+  SafetyLevel,
+} from './safety/index.js';
 import { checkSchemaSafety } from './safety/index.js';
-import type { Finding as SafeFinding, SafetyLevel } from './safety/index.js';
 
 export type Severity = 'error' | 'warning';
 
@@ -15,7 +19,7 @@ export type Severity = 'error' | 'warning';
  */
 export interface Finding {
   severity: Severity;
-  code: 'DROP_TABLE' | 'DROP_COLUMN' | 'ALTER_COLUMN_TYPE' | 'SET_NOT_NULL';
+  code: DestructiveOperationCode;
   table: string;
   column?: string;
   from?: string;
