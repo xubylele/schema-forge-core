@@ -218,7 +218,8 @@ function generateAlterColumnNullability(
 }
 
 function generateCreatePolicy(tableName: string, policy: PolicyNode): string {
-  const parts = [`CREATE POLICY ${policy.name} ON ${tableName} FOR ${policy.command}`];
+  const command = policy.command.toUpperCase();
+  const parts = [`CREATE POLICY "${policy.name}" ON ${tableName} FOR ${command}`];
   if (policy.using !== undefined && policy.using !== '') {
     parts.push(`USING (${policy.using})`);
   }
@@ -229,7 +230,7 @@ function generateCreatePolicy(tableName: string, policy: PolicyNode): string {
 }
 
 function generateDropPolicy(tableName: string, policyName: string): string {
-  return `DROP POLICY ${policyName} ON ${tableName};`;
+  return `DROP POLICY "${policyName}" ON ${tableName};`;
 }
 
 function generateModifyPolicy(tableName: string, policyName: string, policy: PolicyNode): string {

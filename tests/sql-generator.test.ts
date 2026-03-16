@@ -104,7 +104,7 @@ describe('SQL Generator', () => {
 
       const result = generateSql(diff, 'postgres');
 
-      expect(result).toContain('CREATE POLICY users_self_read ON users FOR select');
+      expect(result).toContain('CREATE POLICY "users_self_read" ON users FOR SELECT');
       expect(result).toContain('USING (auth.uid() = id)');
       expect(result).toMatch(/;\s*$/);
     });
@@ -128,7 +128,7 @@ describe('SQL Generator', () => {
 
       const result = generateSql(diff, 'postgres');
 
-      expect(result).toContain('CREATE POLICY posts_update_own ON posts FOR update');
+      expect(result).toContain('CREATE POLICY "posts_update_own" ON posts FOR UPDATE');
       expect(result).toContain('USING (auth.uid() = user_id)');
       expect(result).toContain('WITH CHECK (auth.uid() = user_id)');
     });
@@ -146,7 +146,7 @@ describe('SQL Generator', () => {
 
       const result = generateSql(diff, 'postgres');
 
-      expect(result).toBe('DROP POLICY users_self_read ON users;');
+      expect(result).toBe('DROP POLICY "users_self_read" ON users;');
     });
 
     it('should generate modify policy as drop then create', () => {
@@ -168,8 +168,8 @@ describe('SQL Generator', () => {
 
       const result = generateSql(diff, 'postgres');
 
-      expect(result).toContain('DROP POLICY users_self_read ON users;');
-      expect(result).toContain('CREATE POLICY users_self_read ON users FOR select');
+      expect(result).toContain('DROP POLICY "users_self_read" ON users;');
+      expect(result).toContain('CREATE POLICY "users_self_read" ON users FOR SELECT');
       expect(result).toContain('USING (auth.uid() = id and true)');
     });
 
