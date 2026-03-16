@@ -2,6 +2,7 @@ import type {
   DatabaseSchema,
   StateColumn,
   StateFile,
+  StatePolicy,
   StateTable,
 } from '../types/schema.js';
 
@@ -29,9 +30,22 @@ export async function schemaToState(schema: DatabaseSchema): Promise<StateFile> 
       };
     }
 
+    let policies: Record<string, StatePolicy> | undefined;
+    if (table.policies?.length) {
+      policies = {};
+      for (const p of table.policies) {
+        policies[p.name] = {
+          command: p.command,
+          ...(p.using !== undefined && { using: p.using }),
+          ...(p.withCheck !== undefined && { withCheck: p.withCheck }),
+        };
+      }
+    }
+
     tables[tableName] = {
       columns,
       ...(primaryKeyColumn !== null && { primaryKey: primaryKeyColumn }),
+      ...(policies !== undefined && { policies }),
     };
   }
 

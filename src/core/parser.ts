@@ -1,4 +1,13 @@
-import type { Column, ColumnType, DatabaseSchema, ForeignKey } from '../types/schema.js';
+import type {
+  Column,
+  ColumnType,
+  DatabaseSchema,
+  ForeignKey,
+  PolicyCommand,
+  PolicyNode,
+} from '../types/schema.js';
+
+const POLICY_COMMANDS: PolicyCommand[] = ['select', 'insert', 'update', 'delete'];
 
 /**
  * Parse a schema from DSL source string
@@ -9,6 +18,10 @@ import type { Column, ColumnType, DatabaseSchema, ForeignKey } from '../types/sc
  *   table <name> {
  *     <colName> <type> [modifiers...]
  *   }
+ *   policy "<name>" on <table>
+ *   for select|insert|update|delete
+ *   [using <expression>]
+ *   [with check <expression>]
  * 
  * Supported modifiers:
  * - pk (primary key)
@@ -24,7 +37,11 @@ import type { Column, ColumnType, DatabaseSchema, ForeignKey } from '../types/sc
  */
 export function parseSchema(source: string): DatabaseSchema {
   const lines = source.split('\n');
-  const tables: Record<string, { name: string; columns: Column[]; primaryKey?: string | null }> = {};
+  const tables: Record<
+    string,
+    { name: string; columns: Column[]; primaryKey?: string | null; policies?: PolicyNode[] }
+  > = {};
+  const policyList: { policy: PolicyNode; startLine: number }[] = [];
 
   let currentLine = 0;
 
@@ -330,6 +347,86 @@ export function parseSchema(source: string): DatabaseSchema {
   }
 
   /**
+   * Parse a policy block (multi-line).
+   * First line: policy "<name>" on <table_ident>
+   * Continuation: for <command>, optional using <expr>, optional with check <expr>
+   */
+  function parsePolicyBlock(startLine: number): { policy: PolicyNode; nextLineIndex: number } {
+    const firstLine = cleanLine(lines[startLine]);
+    const declMatch = firstLine.match(/^policy\s+"([^"]*)"\s+on\s+(\w+)\s*$/);
+    if (!declMatch) {
+      throw new Error(
+        `Line ${startLine + 1}: Invalid policy declaration. Expected: policy "<name>" on <table>`
+      );
+    }
+    const policyName = declMatch[1];
+    const tableIdent = declMatch[2];
+    validateIdentifier(tableIdent, startLine + 1, 'table');
+
+    let command: PolicyCommand | undefined;
+    let using: string | undefined;
+    let withCheck: string | undefined;
+    let lineIdx = startLine + 1;
+
+    while (lineIdx < lines.length) {
+      const cleaned = cleanLine(lines[lineIdx]);
+
+      if (!cleaned) {
+        lineIdx++;
+        continue;
+      }
+
+      if (cleaned.startsWith('for ')) {
+        const cmd = cleaned.slice(4).trim().toLowerCase();
+        if (!POLICY_COMMANDS.includes(cmd as PolicyCommand)) {
+          throw new Error(
+            `Line ${lineIdx + 1}: Invalid policy command '${cmd}'. Expected: select, insert, update, or delete`
+          );
+        }
+        if (command !== undefined) {
+          throw new Error(`Line ${lineIdx + 1}: Duplicate 'for' in policy`);
+        }
+        command = cmd as PolicyCommand;
+        lineIdx++;
+        continue;
+      }
+
+      if (cleaned.startsWith('using ')) {
+        if (using !== undefined) {
+          throw new Error(`Line ${lineIdx + 1}: Duplicate 'using' in policy`);
+        }
+        using = cleaned.slice(6).trim();
+        lineIdx++;
+        continue;
+      }
+
+      if (cleaned.startsWith('with check ')) {
+        if (withCheck !== undefined) {
+          throw new Error(`Line ${lineIdx + 1}: Duplicate 'with check' in policy`);
+        }
+        withCheck = cleaned.slice(11).trim();
+        lineIdx++;
+        continue;
+      }
+
+      break;
+    }
+
+    if (command === undefined) {
+      throw new Error(`Line ${startLine + 1}: Policy is missing 'for <command>'`);
+    }
+
+    const policy: PolicyNode = {
+      name: policyName,
+      table: tableIdent,
+      command,
+      ...(using !== undefined && { using }),
+      ...(withCheck !== undefined && { withCheck }),
+    };
+    return { policy, nextLineIndex: lineIdx };
+  }
+
+  /**
    * Parse a table block
    */
   function parseTableBlock(startLine: number): number {
@@ -393,6 +490,7 @@ export function parseSchema(source: string): DatabaseSchema {
   }
 
   // Main parsing loop
+  const policyDeclRegex = /^policy\s+"([^"]*)"\s+on\s+\w+/;
   while (currentLine < lines.length) {
     const cleaned = cleanLine(lines[currentLine]);
 
@@ -401,14 +499,31 @@ export function parseSchema(source: string): DatabaseSchema {
       continue;
     }
 
-    // Check if this is a table definition
     if (cleaned.startsWith('table ')) {
       currentLine = parseTableBlock(currentLine);
+      currentLine++;
+    } else if (policyDeclRegex.test(cleaned)) {
+      const { policy, nextLineIndex } = parsePolicyBlock(currentLine);
+      policyList.push({ policy, startLine: currentLine + 1 });
+      currentLine = nextLineIndex;
     } else {
-      throw new Error(`Line ${currentLine + 1}: Unexpected content '${cleaned}'. Expected table definition.`);
+      throw new Error(
+        `Line ${currentLine + 1}: Unexpected content '${cleaned}'. Expected table or policy definition.`
+      );
     }
+  }
 
-    currentLine++;
+  // Attach policies to tables
+  for (const { policy, startLine } of policyList) {
+    if (!tables[policy.table]) {
+      throw new Error(
+        `Line ${startLine}: Policy "${policy.name}" references undefined table "${policy.table}"`
+      );
+    }
+    if (!tables[policy.table].policies) {
+      tables[policy.table].policies = [];
+    }
+    tables[policy.table].policies!.push(policy);
   }
 
   return { tables };

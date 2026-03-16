@@ -158,6 +158,24 @@ export function checkOperationSafety(operation: Operation): Finding | null {
         operationKind: operation.kind,
       };
 
+    case 'drop_policy':
+      return {
+        safetyLevel,
+        code: 'DROP_POLICY',
+        table: operation.tableName,
+        message: 'Policy removed',
+        operationKind: operation.kind,
+      };
+
+    case 'modify_policy':
+      return {
+        safetyLevel,
+        code: 'MODIFY_POLICY',
+        table: operation.tableName,
+        message: 'Policy expression changed',
+        operationKind: operation.kind,
+      };
+
     default:
       return null;
   }

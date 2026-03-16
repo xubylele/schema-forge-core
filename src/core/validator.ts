@@ -1,4 +1,16 @@
-import type { ColumnType, DatabaseSchema, Table } from '../types/schema.js';
+import type {
+  ColumnType,
+  DatabaseSchema,
+  PolicyCommand,
+  Table
+} from '../types/schema.js';
+
+const VALID_POLICY_COMMANDS: PolicyCommand[] = [
+  'select',
+  'insert',
+  'update',
+  'delete'
+];
 
 /**
  * Valid column types for the database
@@ -51,6 +63,8 @@ export function validateSchema(schema: DatabaseSchema): void {
     const table = schema.tables[tableName];
     validateTableColumns(tableName, table, schema.tables);
   }
+
+  validatePolicies(schema);
 }
 
 /**
@@ -156,6 +170,44 @@ function validateTableColumns(tableName: string, table: Table, allTables: Record
       throw new Error(
         `Table '${tableName}': primary key column '${normalizedPrimaryKey}' is invalid`
       );
+    }
+  }
+}
+
+/**
+ * Validates that all policies reference existing tables, have valid commands, and at least one expression (using or with check).
+ *
+ * @param schema - The DatabaseSchema to validate
+ * @throws Error if any policy is invalid
+ */
+function validatePolicies(schema: DatabaseSchema): void {
+  for (const tableName in schema.tables) {
+    const table = schema.tables[tableName];
+    if (!table.policies?.length) continue;
+
+    for (const policy of table.policies) {
+      if (!schema.tables[policy.table]) {
+        throw new Error(
+          `Policy "${policy.name}" on table "${tableName}": referenced table "${policy.table}" does not exist`
+        );
+      }
+
+      if (!VALID_POLICY_COMMANDS.includes(policy.command)) {
+        throw new Error(
+          `Policy "${policy.name}" on table "${tableName}": invalid command "${policy.command}". Expected: select, insert, update, or delete`
+        );
+      }
+
+      const hasUsing =
+        policy.using !== undefined && String(policy.using).trim() !== '';
+      const hasWithCheck =
+        policy.withCheck !== undefined &&
+        String(policy.withCheck).trim() !== '';
+      if (!hasUsing && !hasWithCheck) {
+        throw new Error(
+          `Policy "${policy.name}" on table "${tableName}": must have at least one of "using" or "with check"`
+        );
+      }
     }
   }
 }

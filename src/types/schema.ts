@@ -16,6 +16,22 @@ export interface ForeignKey {
   column: string;
 }
 
+export type PolicyCommand = 'select' | 'insert' | 'update' | 'delete';
+
+export interface PolicyNode {
+  name: string;
+  table: string;
+  command: PolicyCommand;
+  using?: string;
+  withCheck?: string;
+}
+
+export interface StatePolicy {
+  command: PolicyCommand;
+  using?: string;
+  withCheck?: string;
+}
+
 export interface Column {
   name: string;
   type: ColumnType;
@@ -30,6 +46,7 @@ export interface Table {
   name: string;
   columns: Column[];
   primaryKey?: string | null;
+  policies?: PolicyNode[];
 }
 
 export interface DatabaseSchema {
@@ -48,6 +65,7 @@ export interface StateColumn {
 export interface StateTable {
   columns: Record<string, StateColumn>;
   primaryKey?: string | null;
+  policies?: Record<string, StatePolicy>;
 }
 
 export interface StateFile {
@@ -113,6 +131,14 @@ export type Operation =
     kind: 'add_primary_key_constraint';
     tableName: string;
     columnName: string;
+  }
+  | { kind: 'create_policy'; tableName: string; policy: PolicyNode }
+  | { kind: 'drop_policy'; tableName: string; policyName: string }
+  | {
+    kind: 'modify_policy';
+    tableName: string;
+    policyName: string;
+    policy: PolicyNode;
   };
 
 export interface DiffResult {

@@ -63,6 +63,21 @@ describe('classifyOperation', () => {
       expect(classifyOperation(operation)).toBe('SAFE');
     });
 
+    it('classifies create_policy as SAFE', () => {
+      const operation: Operation = {
+        kind: 'create_policy',
+        tableName: 'users',
+        policy: {
+          name: 'users_self_read',
+          table: 'users',
+          command: 'select',
+          using: 'auth.uid() = id',
+        },
+      };
+
+      expect(classifyOperation(operation)).toBe('SAFE');
+    });
+
     it('classifies column_nullability_changed (not null to nullable) as SAFE', () => {
       const operation: Operation = {
         kind: 'column_nullability_changed',
@@ -100,6 +115,16 @@ describe('classifyOperation', () => {
       const operation: Operation = {
         kind: 'drop_primary_key_constraint',
         tableName: 'users',
+      };
+
+      expect(classifyOperation(operation)).toBe('DESTRUCTIVE');
+    });
+
+    it('classifies drop_policy as DESTRUCTIVE', () => {
+      const operation: Operation = {
+        kind: 'drop_policy',
+        tableName: 'users',
+        policyName: 'users_self_read',
       };
 
       expect(classifyOperation(operation)).toBe('DESTRUCTIVE');
@@ -234,6 +259,22 @@ describe('classifyOperation', () => {
         columnName: 'value',
         fromType: 'text',
         toType: 'int',
+      };
+
+      expect(classifyOperation(operation)).toBe('WARNING');
+    });
+
+    it('classifies modify_policy as WARNING', () => {
+      const operation: Operation = {
+        kind: 'modify_policy',
+        tableName: 'users',
+        policyName: 'users_self_read',
+        policy: {
+          name: 'users_self_read',
+          table: 'users',
+          command: 'select',
+          using: 'auth.uid() = id and true',
+        },
       };
 
       expect(classifyOperation(operation)).toBe('WARNING');
