@@ -3,8 +3,10 @@ import type {
   DatabaseSchema,
   DiffResult,
   Operation,
+  PolicyNode,
   StateColumn,
   StateFile,
+  StatePolicy,
 } from '../types/schema.js';
 import { normalizeDefault } from './normalize.js';
 
@@ -64,6 +66,17 @@ function resolveSchemaPrimaryKey(table: DatabaseSchema['tables'][string]): strin
 
 function normalizeNullable(nullable?: boolean): boolean {
   return nullable ?? true;
+}
+
+function normalizePolicyExpression(s?: string): string {
+  return (s ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function policyEquals(oldP: StatePolicy, newP: PolicyNode): boolean {
+  if (oldP.command !== newP.command) return false;
+  if (normalizePolicyExpression(oldP.using) !== normalizePolicyExpression(newP.using)) return false;
+  if (normalizePolicyExpression(oldP.withCheck) !== normalizePolicyExpression(newP.withCheck)) return false;
+  return true;
 }
 
 /**
@@ -293,6 +306,41 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
           tableName,
           columnName,
         });
+      }
+    }
+  }
+
+  // Phase 9.5: policy diff (create, modify, drop) for common tables only
+  const oldPolicyNamesByTable = (t: StateFile['tables'][string]) =>
+    new Set(Object.keys(t.policies ?? {}));
+  const newPolicyListByTable = (t: DatabaseSchema['tables'][string]) =>
+    t.policies ?? [];
+  for (const tableName of commonTableNames) {
+    const newTable = newSchema.tables[tableName];
+    const oldTable = oldState.tables[tableName];
+    if (!newTable || !oldTable) continue;
+
+    const oldPolicyNames = oldPolicyNamesByTable(oldTable);
+    const newPolicies = newPolicyListByTable(newTable);
+    const newPolicyNames = new Set(newPolicies.map(p => p.name));
+    const sortedNewPolicyNames = Array.from(newPolicyNames).sort((a, b) => a.localeCompare(b));
+    const sortedOldPolicyNames = Array.from(oldPolicyNames).sort((a, b) => a.localeCompare(b));
+
+    for (const policyName of sortedNewPolicyNames) {
+      const policy = newPolicies.find(p => p.name === policyName);
+      if (!policy) continue;
+      if (!oldPolicyNames.has(policyName)) {
+        operations.push({ kind: 'create_policy', tableName, policy });
+      } else {
+        const oldP = oldTable.policies?.[policyName];
+        if (oldP && !policyEquals(oldP, policy)) {
+          operations.push({ kind: 'modify_policy', tableName, policyName, policy });
+        }
+      }
+    }
+    for (const policyName of sortedOldPolicyNames) {
+      if (!newPolicyNames.has(policyName)) {
+        operations.push({ kind: 'drop_policy', tableName, policyName });
       }
     }
   }

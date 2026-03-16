@@ -20,7 +20,9 @@ export type DestructiveOperationCode =
   | 'DROP_TABLE'
   | 'DROP_COLUMN'
   | 'ALTER_COLUMN_TYPE'
-  | 'SET_NOT_NULL';
+  | 'SET_NOT_NULL'
+  | 'DROP_POLICY'
+  | 'MODIFY_POLICY';
 
 /**
  * Finding represents a detected issue or classification of an operation.

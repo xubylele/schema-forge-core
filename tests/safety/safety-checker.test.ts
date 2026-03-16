@@ -45,6 +45,54 @@ describe('checkOperationSafety', () => {
     });
   });
 
+  describe('DROP_POLICY operation', () => {
+    it('returns Finding for drop_policy operation', () => {
+      const operation: Operation = {
+        kind: 'drop_policy',
+        tableName: 'users',
+        policyName: 'users_self_read',
+      };
+
+      const result = checkOperationSafety(operation);
+
+      expect(result).not.toBeNull();
+      expect(result).toMatchObject({
+        safetyLevel: 'DESTRUCTIVE',
+        code: 'DROP_POLICY',
+        table: 'users',
+        message: 'Policy removed',
+        operationKind: 'drop_policy',
+      });
+    });
+  });
+
+  describe('MODIFY_POLICY operation', () => {
+    it('returns Finding for modify_policy operation', () => {
+      const operation: Operation = {
+        kind: 'modify_policy',
+        tableName: 'users',
+        policyName: 'users_self_read',
+        policy: {
+          name: 'users_self_read',
+          table: 'users',
+          command: 'select',
+          using: 'auth.uid() = id and true',
+        },
+      };
+
+      const result = checkOperationSafety(operation);
+
+      expect(result).not.toBeNull();
+      expect(result).toMatchObject({
+        safetyLevel: 'WARNING',
+        code: 'MODIFY_POLICY',
+        table: 'users',
+        message: 'Policy expression changed',
+        operationKind: 'modify_policy',
+      });
+    });
+  });
+
   describe('ALTER_COLUMN_TYPE operation', () => {
     it('returns Finding for UUID type change (DESTRUCTIVE)', () => {
       const operation: Operation = {
@@ -234,6 +282,21 @@ describe('checkOperationSafety', () => {
         kind: 'add_primary_key_constraint',
         tableName: 'users',
         columnName: 'id',
+      };
+
+      expect(checkOperationSafety(operation)).toBeNull();
+    });
+
+    it('returns null for create_policy', () => {
+      const operation: Operation = {
+        kind: 'create_policy',
+        tableName: 'users',
+        policy: {
+          name: 'users_self_read',
+          table: 'users',
+          command: 'select',
+          using: 'auth.uid() = id',
+        },
       };
 
       expect(checkOperationSafety(operation)).toBeNull();

@@ -131,6 +131,15 @@ export function classifyOperation(operation: Operation): SafetyLevel {
     case 'add_primary_key_constraint':
       return 'SAFE';
 
+    case 'create_policy':
+      return 'SAFE';
+
+    case 'drop_policy':
+      return 'DESTRUCTIVE';
+
+    case 'modify_policy':
+      return 'WARNING';
+
     default:
       const _exhaustive: never = operation;
       return _exhaustive;

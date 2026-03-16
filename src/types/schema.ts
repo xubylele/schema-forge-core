@@ -131,6 +131,14 @@ export type Operation =
     kind: 'add_primary_key_constraint';
     tableName: string;
     columnName: string;
+  }
+  | { kind: 'create_policy'; tableName: string; policy: PolicyNode }
+  | { kind: 'drop_policy'; tableName: string; policyName: string }
+  | {
+    kind: 'modify_policy';
+    tableName: string;
+    policyName: string;
+    policy: PolicyNode;
   };
 
 export interface DiffResult {

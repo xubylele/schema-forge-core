@@ -768,4 +768,220 @@ describe('diffSchemas', () => {
 
     expect(firstRun.operations).toEqual(secondRun.operations);
   });
+
+  describe('policy diff', () => {
+    it('should detect new policy when state has no policies and schema has one', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: {
+              id: { type: 'uuid', primaryKey: true },
+              email: { type: 'text' },
+            },
+            primaryKey: 'id',
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'uuid', primaryKey: true },
+              { name: 'email', type: 'text' },
+            ],
+            primaryKey: 'id',
+            policies: [
+              {
+                name: 'users_self_read',
+                table: 'users',
+                command: 'select',
+                using: 'auth.uid() = id',
+              },
+            ],
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]).toEqual({
+        kind: 'create_policy',
+        tableName: 'users',
+        policy: {
+          name: 'users_self_read',
+          table: 'users',
+          command: 'select',
+          using: 'auth.uid() = id',
+        },
+      });
+    });
+
+    it('should detect removed policy when state has policy and schema does not', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: {
+              id: { type: 'uuid', primaryKey: true },
+            },
+            primaryKey: 'id',
+            policies: {
+              users_self_read: { command: 'select', using: 'auth.uid() = id' },
+            },
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            primaryKey: 'id',
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]).toEqual({
+        kind: 'drop_policy',
+        tableName: 'users',
+        policyName: 'users_self_read',
+      });
+    });
+
+    it('should detect modified policy when command or expression changes', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: {
+              id: { type: 'uuid', primaryKey: true },
+            },
+            primaryKey: 'id',
+            policies: {
+              users_self_read: { command: 'select', using: 'auth.uid() = id' },
+            },
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            primaryKey: 'id',
+            policies: [
+              {
+                name: 'users_self_read',
+                table: 'users',
+                command: 'select',
+                using: 'auth.uid() = id and true',
+              },
+            ],
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]).toMatchObject({
+        kind: 'modify_policy',
+        tableName: 'users',
+        policyName: 'users_self_read',
+        policy: {
+          name: 'users_self_read',
+          table: 'users',
+          command: 'select',
+          using: 'auth.uid() = id and true',
+        },
+      });
+    });
+
+    it('should not emit policy op when policies are unchanged', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: { id: { type: 'uuid', primaryKey: true } },
+            primaryKey: 'id',
+            policies: {
+              users_self_read: { command: 'select', using: 'auth.uid() = id' },
+            },
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            primaryKey: 'id',
+            policies: [
+              {
+                name: 'users_self_read',
+                table: 'users',
+                command: 'select',
+                using: 'auth.uid() = id',
+              },
+            ],
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      const policyOps = result.operations.filter(
+        op => op.kind === 'create_policy' || op.kind === 'drop_policy' || op.kind === 'modify_policy'
+      );
+      expect(policyOps).toHaveLength(0);
+    });
+
+    it('should emit policy operations in deterministic order', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: { id: { type: 'uuid', primaryKey: true } },
+            primaryKey: 'id',
+            policies: {
+              alpha: { command: 'select' },
+              zeta: { command: 'update', using: 'true' },
+            },
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            primaryKey: 'id',
+            policies: [
+              { name: 'beta', table: 'users', command: 'insert' },
+              { name: 'zeta', table: 'users', command: 'update', using: 'false' },
+            ],
+          },
+        },
+      };
+
+      const first = diffSchemas(oldState, newSchema);
+      const second = diffSchemas(oldState, newSchema);
+      const policyOps = (r: typeof first) =>
+        r.operations.filter(
+          op =>
+            op.kind === 'create_policy' || op.kind === 'drop_policy' || op.kind === 'modify_policy'
+        );
+      expect(policyOps(first)).toEqual(policyOps(second));
+    });
+  });
 });

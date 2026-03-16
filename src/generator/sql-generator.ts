@@ -1,5 +1,5 @@
 import { legacyPkName, legacyUqName, pkName, uqName } from '../core/normalize.js';
-import type { Column, DiffResult, Operation, Table } from '../types/schema.js';
+import type { Column, DiffResult, Operation, PolicyNode, Table } from '../types/schema.js';
 
 export type Provider = 'supabase' | 'postgres';
 
@@ -65,6 +65,12 @@ function generateOperation(
       return generateDropPrimaryKeyConstraint(operation.tableName);
     case 'add_primary_key_constraint':
       return generateAddPrimaryKeyConstraint(operation.tableName, operation.columnName);
+    case 'create_policy':
+      return generateCreatePolicy(operation.tableName, operation.policy);
+    case 'drop_policy':
+      return generateDropPolicy(operation.tableName, operation.policyName);
+    case 'modify_policy':
+      return generateModifyPolicy(operation.tableName, operation.policyName, operation.policy);
   }
 }
 
@@ -209,4 +215,25 @@ function generateAlterColumnNullability(
   }
 
   return `ALTER TABLE ${tableName} ALTER COLUMN ${columnName} SET NOT NULL;`;
+}
+
+function generateCreatePolicy(tableName: string, policy: PolicyNode): string {
+  const parts = [`CREATE POLICY ${policy.name} ON ${tableName} FOR ${policy.command}`];
+  if (policy.using !== undefined && policy.using !== '') {
+    parts.push(`USING (${policy.using})`);
+  }
+  if (policy.withCheck !== undefined && policy.withCheck !== '') {
+    parts.push(`WITH CHECK (${policy.withCheck})`);
+  }
+  return parts.join(' ') + ';';
+}
+
+function generateDropPolicy(tableName: string, policyName: string): string {
+  return `DROP POLICY ${policyName} ON ${tableName};`;
+}
+
+function generateModifyPolicy(tableName: string, policyName: string, policy: PolicyNode): string {
+  const drop = generateDropPolicy(tableName, policyName);
+  const create = generateCreatePolicy(tableName, policy);
+  return drop + '\n\n' + create;
 }

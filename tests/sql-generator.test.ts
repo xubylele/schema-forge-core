@@ -86,6 +86,93 @@ describe('SQL Generator', () => {
       expect(result).toBe('ALTER TABLE users DROP COLUMN age;');
     });
 
+    it('should generate create policy statement', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_policy',
+            tableName: 'users',
+            policy: {
+              name: 'users_self_read',
+              table: 'users',
+              command: 'select',
+              using: 'auth.uid() = id',
+            },
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+
+      expect(result).toContain('CREATE POLICY users_self_read ON users FOR select');
+      expect(result).toContain('USING (auth.uid() = id)');
+      expect(result).toMatch(/;\s*$/);
+    });
+
+    it('should generate create policy with with check', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_policy',
+            tableName: 'posts',
+            policy: {
+              name: 'posts_update_own',
+              table: 'posts',
+              command: 'update',
+              using: 'auth.uid() = user_id',
+              withCheck: 'auth.uid() = user_id',
+            },
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+
+      expect(result).toContain('CREATE POLICY posts_update_own ON posts FOR update');
+      expect(result).toContain('USING (auth.uid() = user_id)');
+      expect(result).toContain('WITH CHECK (auth.uid() = user_id)');
+    });
+
+    it('should generate drop policy statement', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'drop_policy',
+            tableName: 'users',
+            policyName: 'users_self_read',
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+
+      expect(result).toBe('DROP POLICY users_self_read ON users;');
+    });
+
+    it('should generate modify policy as drop then create', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'modify_policy',
+            tableName: 'users',
+            policyName: 'users_self_read',
+            policy: {
+              name: 'users_self_read',
+              table: 'users',
+              command: 'select',
+              using: 'auth.uid() = id and true',
+            },
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+
+      expect(result).toContain('DROP POLICY users_self_read ON users;');
+      expect(result).toContain('CREATE POLICY users_self_read ON users FOR select');
+      expect(result).toContain('USING (auth.uid() = id and true)');
+    });
+
     it('should generate alter column type statement', () => {
       const diff: DiffResult = {
         operations: [
