@@ -1,5 +1,44 @@
 # @xubylele/schema-forge-core
 
+## 1.4.0
+
+### Minor Changes
+
+- 8307d34: ✨ feat(validate): add policy validation in schema checks
+
+  - Add validation ensuring policies reference existing tables.
+  - Validate policy commands and require at least one expression (`USING` or `WITH CHECK`).
+  - Integrate policy validation into the schema validation workflow.
+  - Add tests covering valid and invalid policy configurations.
+
+- a50247e: ✨ feat(policies): enable Row Level Security when generating policy SQL
+
+  - Generate SQL to enable Row Level Security (RLS) when creating or modifying policies.
+  - Ensure RLS is enabled only once per table even when multiple policies exist.
+  - Add tests verifying correct RLS statement generation during policy operations.
+
+- 2dca1cb: ✨ feat(policies): add policy management support in schema state
+
+  - Add new types `PolicyCommand`, `PolicyNode`, and `StatePolicy` for policy definitions.
+  - Extend `Table` and `StateTable` interfaces with optional `policies` property.
+  - Update `schemaToState` and `createSnapshot` to handle table policies.
+
+- f12118c: ✨ feat(diff): add policy operations to schema diffing
+
+  - Add support for policy creation, modification, and deletion during schema diffing.
+  - Introduce new operation types: `create_policy`, `modify_policy`, and `drop_policy`.
+  - Extend `diffSchemas` to detect policy changes between schema states.
+  - Classify policy operations for safety: `create_policy` (SAFE), `modify_policy` (WARNING), `drop_policy` (DESTRUCTIVE).
+  - Implement SQL generation for policy operations.
+  - Add tests covering policy diffing and SQL generation.
+
+- 4e8e6d3: ✨ feat(parser): add policy parsing support in schema definitions
+
+  - Extend `parseSchema` to support table policy declarations.
+  - Add `parsePolicyBlock` to parse policy commands and conditions.
+  - Update table structures to include optional `policies` property.
+  - Add tests for policy parsing, including validation and duplicate command detection.
+
 ## 1.3.2
 
 ### Patch Changes
