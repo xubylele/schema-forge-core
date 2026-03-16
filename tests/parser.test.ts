@@ -625,4 +625,166 @@ describe('parseSchema', () => {
 
     expect(() => parseSchema(source)).toThrow(/Function call is missing closing parenthesis/);
   });
+
+  describe('policy parsing', () => {
+    it('should parse a single policy (example from ticket)', () => {
+      const source = `
+        table users {
+          id uuid pk
+          email varchar
+        }
+        policy "Users can read themselves" on users
+        for select
+        using auth.uid() = id
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.tables.users.policies).toBeDefined();
+      expect(result.tables.users.policies).toHaveLength(1);
+      expect(result.tables.users.policies![0]).toEqual({
+        name: 'Users can read themselves',
+        table: 'users',
+        command: 'select',
+        using: 'auth.uid() = id',
+      });
+    });
+
+    it('should parse policy with with check', () => {
+      const source = `
+        table posts {
+          id uuid pk
+          user_id uuid
+        }
+        policy "Users can update own posts" on posts
+        for update
+        using auth.uid() = user_id
+        with check auth.uid() = user_id
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.tables.posts.policies).toHaveLength(1);
+      expect(result.tables.posts.policies![0].withCheck).toBe('auth.uid() = user_id');
+      expect(result.tables.posts.policies![0].command).toBe('update');
+    });
+
+    it('should parse multiple policies on the same table', () => {
+      const source = `
+        table users {
+          id uuid pk
+        }
+        policy "Select self" on users
+        for select
+        using auth.uid() = id
+
+        policy "Update self" on users
+        for update
+        using auth.uid() = id
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.tables.users.policies).toHaveLength(2);
+      expect(result.tables.users.policies!.map((p) => p.name)).toEqual(['Select self', 'Update self']);
+      expect(result.tables.users.policies!.map((p) => p.command)).toEqual(['select', 'update']);
+    });
+
+    it('should allow policy declared before table (order independence)', () => {
+      const source = `
+        policy "Users can read themselves" on users
+        for select
+        using auth.uid() = id
+
+        table users {
+          id uuid pk
+          email varchar
+        }
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.tables.users.policies).toHaveLength(1);
+      expect(result.tables.users.policies![0].name).toBe('Users can read themselves');
+    });
+
+    it('should ignore empty and comment lines between policy lines', () => {
+      const source = `
+        table users {
+          id uuid pk
+        }
+        # comment
+        policy "Read self" on users
+        for select
+        # inline ignored
+        using auth.uid() = id
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.tables.users.policies).toHaveLength(1);
+      expect(result.tables.users.policies![0].using).toBe('auth.uid() = id');
+    });
+
+    it('should throw error when policy is missing for command', () => {
+      const source = `
+        table users {
+          id uuid pk
+        }
+        policy "Bad" on users
+        using auth.uid() = id
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/Policy is missing 'for <command>'/);
+    });
+
+    it('should throw error on invalid for command', () => {
+      const source = `
+        table users {
+          id uuid pk
+        }
+        policy "Bad" on users
+        for invalid_command
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/Invalid policy command 'invalid_command'/);
+    });
+
+    it('should throw error when policy references undefined table', () => {
+      const source = `
+        table users {
+          id uuid pk
+        }
+        policy "Bad" on nonexistent
+        for select
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/references undefined table "nonexistent"/);
+    });
+
+    it('should throw error on malformed policy declaration (trailing garbage)', () => {
+      const source = `
+        table users {
+          id uuid pk
+        }
+        policy "Bad" on users extra
+        for select
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/Invalid policy declaration/);
+    });
+
+    it('should throw error on duplicate for in policy', () => {
+      const source = `
+        table users {
+          id uuid pk
+        }
+        policy "Bad" on users
+        for select
+        for insert
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/Duplicate 'for' in policy/);
+    });
+  });
 });
