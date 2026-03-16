@@ -104,6 +104,10 @@ describe('SQL Generator', () => {
 
       const result = generateSql(diff, 'postgres');
 
+      expect(result).toContain('ALTER TABLE users ENABLE ROW LEVEL SECURITY');
+      expect(result.indexOf('ENABLE ROW LEVEL SECURITY')).toBeLessThan(
+        result.indexOf('CREATE POLICY')
+      );
       expect(result).toContain('CREATE POLICY "users_self_read" ON users FOR SELECT');
       expect(result).toContain('USING (auth.uid() = id)');
       expect(result).toMatch(/;\s*$/);
@@ -128,6 +132,10 @@ describe('SQL Generator', () => {
 
       const result = generateSql(diff, 'postgres');
 
+      expect(result).toContain('ALTER TABLE posts ENABLE ROW LEVEL SECURITY');
+      expect(result.indexOf('ENABLE ROW LEVEL SECURITY')).toBeLessThan(
+        result.indexOf('CREATE POLICY')
+      );
       expect(result).toContain('CREATE POLICY "posts_update_own" ON posts FOR UPDATE');
       expect(result).toContain('USING (auth.uid() = user_id)');
       expect(result).toContain('WITH CHECK (auth.uid() = user_id)');
@@ -168,9 +176,48 @@ describe('SQL Generator', () => {
 
       const result = generateSql(diff, 'postgres');
 
+      expect(result).toContain('ALTER TABLE users ENABLE ROW LEVEL SECURITY');
+      expect(result.indexOf('ENABLE ROW LEVEL SECURITY')).toBeLessThan(
+        result.indexOf('DROP POLICY')
+      );
       expect(result).toContain('DROP POLICY "users_self_read" ON users;');
       expect(result).toContain('CREATE POLICY "users_self_read" ON users FOR SELECT');
       expect(result).toContain('USING (auth.uid() = id and true)');
+    });
+
+    it('should emit ENABLE RLS once per table when multiple policies on same table', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_policy',
+            tableName: 'users',
+            policy: {
+              name: 'users_self_read',
+              table: 'users',
+              command: 'select',
+              using: 'auth.uid() = id',
+            },
+          },
+          {
+            kind: 'create_policy',
+            tableName: 'users',
+            policy: {
+              name: 'users_self_update',
+              table: 'users',
+              command: 'update',
+              using: 'auth.uid() = id',
+              withCheck: 'auth.uid() = id',
+            },
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+
+      const rlsMatches = result.match(/ALTER TABLE users ENABLE ROW LEVEL SECURITY/g);
+      expect(rlsMatches).toHaveLength(1);
+      expect(result).toContain('CREATE POLICY "users_self_read" ON users FOR SELECT');
+      expect(result).toContain('CREATE POLICY "users_self_update" ON users FOR UPDATE');
     });
 
     it('should generate alter column type statement', () => {

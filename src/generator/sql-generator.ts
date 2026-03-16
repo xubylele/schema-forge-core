@@ -8,14 +8,26 @@ export interface SqlConfig {
   timestampDefault?: string;
 }
 
+function generateEnableRls(tableName: string): string {
+  return `ALTER TABLE ${tableName} ENABLE ROW LEVEL SECURITY;`;
+}
+
 export function generateSql(
   diff: DiffResult,
   provider: Provider,
   sqlConfig?: SqlConfig
 ): string {
   const statements: string[] = [];
+  const enabledRlsTables = new Set<string>();
 
   for (const operation of diff.operations) {
+    if (operation.kind === 'create_policy' || operation.kind === 'modify_policy') {
+      const tableName = operation.tableName;
+      if (!enabledRlsTables.has(tableName)) {
+        statements.push(generateEnableRls(tableName));
+        enabledRlsTables.add(tableName);
+      }
+    }
     const sql = generateOperation(operation, provider, sqlConfig);
     if (sql) {
       statements.push(sql);
