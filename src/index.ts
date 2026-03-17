@@ -20,7 +20,7 @@ export { generateSql } from './generator/sql-generator.js';
 export type { Provider, SqlConfig } from './generator/sql-generator.js';
 
 // SQL Parsing and Import
-export { parseMigrationSql, parseCreateTable, parseAlterTableAddColumn, parseAlterColumnType, parseSetDropNotNull, parseSetDropDefault, parseAddDropConstraint, parseDropColumn, parseDropTable } from './core/sql/parse-migration.js';
+export { parseMigrationSql, parseCreateTable, parseAlterTableAddColumn, parseAlterColumnType, parseSetDropNotNull, parseSetDropDefault, parseAddDropConstraint, parseDropColumn, parseDropTable, parseEnableRls, parseCreatePolicy } from './core/sql/parse-migration.js';
 export { applySqlOps } from './core/sql/apply-ops.js';
 export { schemaToDsl } from './core/sql/schema-to-dsl.js';
 export { loadMigrationSqlInput } from './core/sql/load-migrations.js';

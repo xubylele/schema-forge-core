@@ -155,6 +155,43 @@ describe('parseMigrationSql', () => {
     expect(result.warnings[0].reason).toContain('Unsupported');
   });
 
+  it('parses ENABLE ROW LEVEL SECURITY and CREATE POLICY into ops', () => {
+    const sql = `
+      ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+      CREATE POLICY "Users can read own row"
+        ON public.users
+        FOR SELECT
+        USING (auth.uid() = id);
+    `;
+    const result = parseMigrationSql(sql);
+
+    expect(result.warnings).toHaveLength(0);
+    expect(result.ops).toHaveLength(2);
+    expect(result.ops[0]).toEqual({ kind: 'ENABLE_RLS', table: 'users' });
+    expect(result.ops[1]).toMatchObject({
+      kind: 'CREATE_POLICY',
+      table: 'users',
+      name: 'Users can read own row',
+      command: 'select',
+      using: 'auth.uid() = id'
+    });
+  });
+
+  it('parses CREATE POLICY with WITH CHECK', () => {
+    const sql = `CREATE POLICY "Allow insert" ON public.posts FOR INSERT WITH CHECK (auth.uid() = user_id);`;
+    const result = parseMigrationSql(sql);
+
+    expect(result.warnings).toHaveLength(0);
+    expect(result.ops).toHaveLength(1);
+    expect(result.ops[0]).toMatchObject({
+      kind: 'CREATE_POLICY',
+      table: 'posts',
+      name: 'Allow insert',
+      command: 'insert',
+      withCheck: 'auth.uid() = user_id'
+    });
+  });
+
   it('returns ordered operations across multiple statements', () => {
     const sql = `
       CREATE TABLE public.users (

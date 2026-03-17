@@ -1,4 +1,5 @@
 import type { Column, DatabaseSchema } from '../types/schema.js';
+import type { PolicyCommand } from '../types/schema.js';
 
 export type SqlOp =
   | {
@@ -16,7 +17,16 @@ export type SqlOp =
   | { kind: 'ADD_CONSTRAINT'; table: string; constraint: ParsedConstraint }
   | { kind: 'DROP_CONSTRAINT'; table: string; name: string }
   | { kind: 'DROP_COLUMN'; table: string; column: string }
-  | { kind: 'DROP_TABLE'; table: string };
+  | { kind: 'DROP_TABLE'; table: string }
+  | { kind: 'ENABLE_RLS'; table: string }
+  | {
+    kind: 'CREATE_POLICY';
+    table: string;
+    name: string;
+    command: PolicyCommand;
+    using?: string;
+    withCheck?: string;
+  };
 
 export interface ParsedColumn {
   name: string;

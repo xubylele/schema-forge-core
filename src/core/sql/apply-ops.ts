@@ -1,4 +1,4 @@
-import type { DatabaseSchema, Table } from '../../types/schema.js';
+import type { DatabaseSchema, PolicyNode, Table } from '../../types/schema.js';
 import type { ApplySqlOpsResult, ParseWarning, ParsedColumn, ParsedConstraint, SqlOp } from '../../types/sql.js';
 
 function toSchemaColumn(column: ParsedColumn) {
@@ -189,6 +189,32 @@ export function applySqlOps(ops: SqlOp[]): ApplySqlOpsResult {
 
       case 'DROP_TABLE': {
         delete tables[op.table];
+        break;
+      }
+
+      case 'ENABLE_RLS': {
+        getOrCreateTable(tables, op.table);
+        break;
+      }
+
+      case 'CREATE_POLICY': {
+        const table = getOrCreateTable(tables, op.table);
+        if (!table.policies) {
+          table.policies = [];
+        }
+        const policy: PolicyNode = {
+          name: op.name,
+          table: op.table,
+          command: op.command,
+          ...(op.using !== undefined && { using: op.using }),
+          ...(op.withCheck !== undefined && { withCheck: op.withCheck })
+        };
+        const existing = table.policies.findIndex(p => p.name === op.name);
+        if (existing >= 0) {
+          table.policies[existing] = policy;
+        } else {
+          table.policies.push(policy);
+        }
         break;
       }
     }
