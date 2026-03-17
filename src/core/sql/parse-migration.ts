@@ -556,7 +556,8 @@ export function parseDropTable(stmt: string): SqlOp | null {
 }
 
 export function parseEnableRls(stmt: string): SqlOp | null {
-  const match = stmt.match(/^alter\s+table\s+(\S+)\s+enable\s+row\s+level\s+security/i);
+  const s = stmt.replace(/\s+/g, ' ').trim();
+  const match = s.match(/^alter\s+table\s+(\S+)\s+enable\s+row\s+level\s+security\s*;?$/i);
   if (!match) {
     return null;
   }
