@@ -112,29 +112,24 @@ function generateColumnDefinition(
 ): string {
   const parts: string[] = [column.name, column.type];
 
-  // Foreign key inline
   if (column.foreignKey) {
     parts.push(
       `references ${column.foreignKey.table}(${column.foreignKey.column})`
     );
   }
 
-  // Primary key
   if (column.primaryKey) {
     parts.push('primary key');
   }
 
-  // Unique
   if (column.unique) {
     parts.push('unique');
   }
 
-  // Nullable
   if (column.nullable === false) {
     parts.push('not null');
   }
 
-  // Default
   if (column.default !== undefined) {
     parts.push('default ' + column.default);
   } else if (
@@ -230,8 +225,11 @@ function generateAlterColumnNullability(
 }
 
 function generateCreatePolicy(tableName: string, policy: PolicyNode): string {
-  const command = policy.command.toUpperCase();
+  const command = policy.command === 'all' ? 'ALL' : policy.command.toUpperCase();
   const parts = [`CREATE POLICY "${policy.name}" ON ${tableName} FOR ${command}`];
+  if (policy.to !== undefined && policy.to.length > 0) {
+    parts.push(`TO ${policy.to.join(', ')}`);
+  }
   if (policy.using !== undefined && policy.using !== '') {
     parts.push(`USING (${policy.using})`);
   }

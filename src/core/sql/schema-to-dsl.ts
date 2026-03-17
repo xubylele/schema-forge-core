@@ -1,4 +1,4 @@
-import type { DatabaseSchema } from '../../types/schema.js';
+import type { DatabaseSchema, PolicyNode } from '../../types/schema.js';
 
 function renderColumn(column: {
   name: string;
@@ -29,20 +29,44 @@ function renderColumn(column: {
   return `  ${parts.join(' ')}`;
 }
 
+function renderPolicy(policy: PolicyNode): string {
+  const lines: string[] = [
+    `policy "${policy.name}" on ${policy.table}`,
+    `for ${policy.command}`
+  ];
+  if (policy.to !== undefined && policy.to.length > 0) {
+    lines.push(`to ${policy.to.join(' ')}`);
+  }
+  if (policy.using !== undefined && policy.using !== '') {
+    lines.push(`using ${policy.using}`);
+  }
+  if (policy.withCheck !== undefined && policy.withCheck !== '') {
+    lines.push(`with check ${policy.withCheck}`);
+  }
+  return lines.join('\n');
+}
+
 export function schemaToDsl(schema: DatabaseSchema): string {
   const tableNames = Object.keys(schema.tables).sort((left, right) => left.localeCompare(right));
 
-  const blocks = tableNames.map(tableName => {
+  const blocks: string[] = [];
+  for (const tableName of tableNames) {
     const table = schema.tables[tableName];
-    const lines: string[] = [`table ${table.name} {`];
+    const tableLines: string[] = [`table ${table.name} {`];
 
     for (const column of table.columns) {
-      lines.push(renderColumn(column as any));
+      tableLines.push(renderColumn(column as any));
     }
 
-    lines.push('}');
-    return lines.join('\n');
-  });
+    tableLines.push('}');
+    blocks.push(tableLines.join('\n'));
+
+    if (table.policies?.length) {
+      for (const policy of table.policies) {
+        blocks.push(renderPolicy(policy));
+      }
+    }
+  }
 
   if (blocks.length === 0) {
     return '# SchemaForge schema definition\n';

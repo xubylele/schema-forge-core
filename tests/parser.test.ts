@@ -738,6 +738,58 @@ describe('parseSchema', () => {
       expect(() => parseSchema(source)).toThrow(/Policy is missing 'for <command>'/);
     });
 
+    it('should parse policy with for all', () => {
+      const source = `
+        table users {
+          id uuid pk
+        }
+        policy "Own rows" on users
+        for all
+        using auth.uid() = id
+        with check auth.uid() = id
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.tables.users.policies).toHaveLength(1);
+      expect(result.tables.users.policies![0].command).toBe('all');
+      expect(result.tables.users.policies![0].using).toBe('auth.uid() = id');
+      expect(result.tables.users.policies![0].withCheck).toBe('auth.uid() = id');
+    });
+
+    it('should parse policy with to roles', () => {
+      const source = `
+        table posts {
+          id uuid pk
+        }
+        policy "Authenticated write" on posts
+        for insert
+        to authenticated
+        with check auth.uid() = user_id
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.tables.posts.policies).toHaveLength(1);
+      expect(result.tables.posts.policies![0].to).toEqual(['authenticated']);
+    });
+
+    it('should parse policy with for select to anon authenticated', () => {
+      const source = `
+        table items {
+          id uuid pk
+        }
+        policy "Public read" on items
+        for select to anon authenticated
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.tables.items.policies).toHaveLength(1);
+      expect(result.tables.items.policies![0].command).toBe('select');
+      expect(result.tables.items.policies![0].to).toEqual(['anon', 'authenticated']);
+    });
+
     it('should throw error on invalid for command', () => {
       const source = `
         table users {

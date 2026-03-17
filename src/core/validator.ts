@@ -9,7 +9,8 @@ const VALID_POLICY_COMMANDS: PolicyCommand[] = [
   'select',
   'insert',
   'update',
-  'delete'
+  'delete',
+  'all'
 ];
 
 /**
@@ -58,7 +59,6 @@ function isValidColumnType(type: string): boolean {
 export function validateSchema(schema: DatabaseSchema): void {
   validateDuplicateTables(schema);
 
-  // Validate each table
   for (const tableName in schema.tables) {
     const table = schema.tables[tableName];
     validateTableColumns(tableName, table, schema.tables);
@@ -94,42 +94,35 @@ function validateDuplicateTables(schema: DatabaseSchema): void {
  * @throws Error if validation violations are detected
  */
 function validateTableColumns(tableName: string, table: Table, allTables: Record<string, Table>): void {
-  // Validate duplicate columns
   const columnNames = new Set<string>();
   const primaryKeyColumns: string[] = [];
 
   for (const column of table.columns) {
-    // Check for duplicate columns
     if (columnNames.has(column.name)) {
       throw new Error(`Table '${tableName}': duplicate column '${column.name}'`);
     }
     columnNames.add(column.name);
 
-    // Count primary keys
     if (column.primaryKey) {
       primaryKeyColumns.push(column.name);
     }
 
-    // Validate column type
     if (!isValidColumnType(column.type)) {
       throw new Error(
         `Table '${tableName}', column '${column.name}': type '${column.type}' is not valid. Supported types: ${VALID_BASE_COLUMN_TYPES.join(', ')}, varchar(n), numeric(p,s)`
       );
     }
 
-    // Validate foreign key
     if (column.foreignKey) {
       const fkTable = column.foreignKey.table;
       const fkColumn = column.foreignKey.column;
 
-      // Check that the referenced table exists
       if (!allTables[fkTable]) {
         throw new Error(
           `Table '${tableName}', column '${column.name}': referenced table '${fkTable}' does not exist`
         );
       }
 
-      // Check that the column exists in the referenced table
       const referencedTable = allTables[fkTable];
       const columnExists = referencedTable.columns.some(col => col.name === fkColumn);
 
@@ -141,7 +134,6 @@ function validateTableColumns(tableName: string, table: Table, allTables: Record
     }
   }
 
-  // Validate multiple primary keys
   if (primaryKeyColumns.length > 1) {
     throw new Error(`Table '${tableName}': can only have one primary key (found ${primaryKeyColumns.length})`);
   }
@@ -194,7 +186,7 @@ function validatePolicies(schema: DatabaseSchema): void {
 
       if (!VALID_POLICY_COMMANDS.includes(policy.command)) {
         throw new Error(
-          `Policy "${policy.name}" on table "${tableName}": invalid command "${policy.command}". Expected: select, insert, update, or delete`
+          `Policy "${policy.name}" on table "${tableName}": invalid command "${policy.command}". Expected: select, insert, update, delete, or all`
         );
       }
 

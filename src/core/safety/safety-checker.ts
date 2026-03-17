@@ -99,7 +99,6 @@ function generateTypeChangeMessage(from: string, to: string): string {
 export function checkOperationSafety(operation: Operation): Finding | null {
   const safetyLevel = classifyOperation(operation);
 
-  // Only generate findings for non-safe operations
   if (safetyLevel === 'SAFE') {
     return null;
   }
