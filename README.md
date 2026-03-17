@@ -153,6 +153,61 @@ report.warnings.forEach(f => {
 
 ---
 
+## Policy management (RLS)
+
+Schema Forge supports **Row Level Security (RLS)** policies in the DSL. Policies are parsed, validated, diffed, and emitted as PostgreSQL `CREATE POLICY` / `DROP POLICY` statements.
+
+### DSL syntax
+
+Policies are declared at the top level (outside table blocks). The table must be defined before the policy references it.
+
+```
+table users {
+  id uuid pk
+  email text unique
+}
+
+policy "Users can read themselves" on users
+for select
+using auth.uid() = id
+```
+
+* **First line:** `policy "<name>" on <table>` — quoted name and table identifier.
+* **Continuation lines:**
+  * `for <command>` — required; one of `select`, `insert`, `update`, `delete`.
+  * `using <expr>` — optional; expression for row visibility (e.g. SELECT) or existing row check (UPDATE/DELETE).
+  * `with check <expr>` — optional; expression for new rows (INSERT/UPDATE).
+
+At least one of `using` or `with check` is required (enforced by `validateSchema`).
+
+### AST and state
+
+* **Schema:** `Table.policies` is an array of `PolicyNode` (`name`, `table`, `command`, `using?`, `withCheck?`).
+* **State:** `StateTable.policies` is `Record<string, StatePolicy>` (keyed by policy name; `StatePolicy` has `command`, `using?`, `withCheck?`).
+* **Operations:** The diff engine emits `create_policy`, `drop_policy`, and `modify_policy` (drop + create) when comparing state to schema.
+
+### Validation
+
+`validateSchema(schema)` runs policy checks and throws if:
+
+* The policy’s table does not exist.
+* The command is not one of `select`, `insert`, `update`, `delete`.
+* Neither `using` nor `with check` is set and non-empty.
+
+Invalid policies produce clear error messages (e.g. used by the CLI validate command).
+
+### SQL generation (Postgres)
+
+For the `postgres` provider, policies are generated as:
+
+* **Create:** `CREATE POLICY "<name>" ON <table> FOR <COMMAND> [USING (...)] [WITH CHECK (...)];`
+* **Drop:** `DROP POLICY "<name>" ON <table>;`
+* **Modify:** drop then create (two statements).
+
+RLS must be enabled on the table separately (e.g. `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`); the core does not emit that by default.
+
+---
+
 ## SQL Import (Reverse Engineering)
 
 ```ts
@@ -233,6 +288,7 @@ Full API surface is available via TypeScript exports.
 All domain types are exported for integration:
 
 * `DatabaseSchema`, `Table`, `Column`, `ForeignKey`
+* `PolicyNode`, `PolicyCommand`, `StatePolicy`
 * `StateFile`, `StateTable`, `StateColumn`
 * `DiffResult`, `Operation`
 * `SqlOp`, `ParseResult`, `ApplySqlOpsResult`
