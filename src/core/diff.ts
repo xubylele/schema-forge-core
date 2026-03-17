@@ -76,6 +76,9 @@ function policyEquals(oldP: StatePolicy, newP: PolicyNode): boolean {
   if (oldP.command !== newP.command) return false;
   if (normalizePolicyExpression(oldP.using) !== normalizePolicyExpression(newP.using)) return false;
   if (normalizePolicyExpression(oldP.withCheck) !== normalizePolicyExpression(newP.withCheck)) return false;
+  const oldTo = (oldP.to ?? []).slice().sort().join(',');
+  const newTo = (newP.to ?? []).slice().sort().join(',');
+  if (oldTo !== newTo) return false;
   return true;
 }
 
@@ -91,7 +94,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
   const sortedNewTableNames = getSortedNames(newTableNames);
   const sortedOldTableNames = getSortedNames(oldTableNames);
 
-  // Phase 1: create tables (A-Z)
   for (const tableName of sortedNewTableNames) {
     if (!oldTableNames.has(tableName)) {
       operations.push({
@@ -105,7 +107,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     oldTableNames.has(tableName)
   );
 
-  // Phase 2: detect column type changes in schema order
   for (const tableName of commonTableNames) {
     const newTable = newSchema.tables[tableName];
     const oldTable = oldState.tables[tableName];
@@ -135,7 +136,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 3: drop PK constraints for changed/removed primary keys
   for (const tableName of commonTableNames) {
     const newTable = newSchema.tables[tableName];
     const oldTable = oldState.tables[tableName];
@@ -155,7 +155,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 4: detect unique changes for existing columns in schema order
   for (const tableName of commonTableNames) {
     const newTable = newSchema.tables[tableName];
     const oldTable = oldState.tables[tableName];
@@ -185,7 +184,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 5: detect column nullability changes in schema order
   for (const tableName of commonTableNames) {
     const newTable = newSchema.tables[tableName];
     const oldTable = oldState.tables[tableName];
@@ -215,7 +213,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 6: detect column default changes in schema order
   for (const tableName of commonTableNames) {
     const newTable = newSchema.tables[tableName];
     const oldTable = oldState.tables[tableName];
@@ -245,7 +242,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 7: add columns in schema order
   for (const tableName of commonTableNames) {
     const newTable = newSchema.tables[tableName];
     const oldTable = oldState.tables[tableName];
@@ -267,7 +263,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 8: add PK constraints for added/changed primary keys
   for (const tableName of commonTableNames) {
     const newTable = newSchema.tables[tableName];
     const oldTable = oldState.tables[tableName];
@@ -288,7 +283,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 9: drop columns in state key order
   for (const tableName of commonTableNames) {
     const newTable = newSchema.tables[tableName];
     const oldTable = oldState.tables[tableName];
@@ -310,7 +304,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 9.5: policy diff (create, modify, drop) for common tables only
   const oldPolicyNamesByTable = (t: StateFile['tables'][string]) =>
     new Set(Object.keys(t.policies ?? {}));
   const newPolicyListByTable = (t: DatabaseSchema['tables'][string]) =>
@@ -345,7 +338,6 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
     }
   }
 
-  // Phase 10: drop tables (A-Z)
   for (const tableName of sortedOldTableNames) {
     if (!newTableNames.has(tableName)) {
       operations.push({

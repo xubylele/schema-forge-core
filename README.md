@@ -236,6 +236,12 @@ for (const input of inputs) {
 
 ---
 
+## Documentation
+
+* [RLS policy patterns (PostgreSQL / Supabase)](./docs/rls-policy-patterns.md) – user-owned rows, public read / authenticated write, multi-tenant examples.
+
+---
+
 ## Supported Providers
 
 * `postgres`

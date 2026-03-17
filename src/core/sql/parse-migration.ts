@@ -555,6 +555,109 @@ export function parseDropTable(stmt: string): SqlOp | null {
   };
 }
 
+export function parseEnableRls(stmt: string): SqlOp | null {
+  const s = stmt.replace(/\s+/g, ' ').trim();
+  const match = s.match(/^alter\s+table\s+(\S+)\s+enable\s+row\s+level\s+security\s*;?$/i);
+  if (!match) {
+    return null;
+  }
+  return {
+    kind: 'ENABLE_RLS',
+    table: normalizeIdentifier(match[1])
+  };
+}
+
+function extractBalancedParen(s: string, start: number): { content: string; endIndex: number } | null {
+  if (start < 0 || s[start] !== '(') {
+    return null;
+  }
+  let depth = 1;
+  let i = start + 1;
+  while (i < s.length && depth > 0) {
+    const c = s[i];
+    if (c === "'" && (i === 0 || s[i - 1] !== '\\')) {
+      i++;
+      while (i < s.length && (s[i] !== "'" || s[i - 1] === '\\')) {
+        i++;
+      }
+      i++;
+      continue;
+    }
+    if (c === '(') {
+      depth++;
+    } else if (c === ')') {
+      depth--;
+    }
+    i++;
+  }
+  if (depth !== 0) {
+    return null;
+  }
+  return { content: s.slice(start + 1, i - 1).trim(), endIndex: i };
+}
+
+export function parseCreatePolicy(stmt: string): SqlOp | null {
+  const s = stmt.replace(/\s+/g, ' ').trim();
+  const quotedMatch = s.match(/^create\s+policy\s+"([^"]+)"\s+on\s+(\S+)\s+for\s+(all|select|insert|update|delete)/i);
+  const unquotedMatch = quotedMatch ? null : s.match(/^create\s+policy\s+(\S+)\s+on\s+(\S+)\s+for\s+(all|select|insert|update|delete)/i);
+  const match = quotedMatch ?? unquotedMatch;
+  if (!match) {
+    return null;
+  }
+  const name = match[1];
+  const table = normalizeIdentifier(match[2]);
+  const command = match[3].toLowerCase() as 'all' | 'select' | 'insert' | 'update' | 'delete';
+  let rest = s.slice(match[0].length).trim();
+  let toRoles: string[] | undefined;
+  const toMatch = rest.match(/^\s*to\s+/i) ?? rest.match(/\s+to\s+/i);
+  if (toMatch) {
+    const toIdx = toMatch.index!;
+    const afterTo = rest.slice(toIdx + toMatch[0].length);
+    const usingStart = afterTo.toLowerCase().indexOf(' using (');
+    const withCheckStart = afterTo.toLowerCase().indexOf(' with check (');
+    const end = usingStart >= 0 && withCheckStart >= 0
+      ? Math.min(usingStart, withCheckStart)
+      : usingStart >= 0
+        ? usingStart
+        : withCheckStart >= 0
+          ? withCheckStart
+          : afterTo.length;
+    const toPart = afterTo.slice(0, end).trim();
+    if (toPart) {
+      toRoles = toPart.split(/[\s,]+/).map(r => r.trim()).filter(Boolean);
+    }
+    rest = rest.slice(0, toIdx) + rest.slice(toIdx + toMatch[0].length + end);
+  }
+  let using: string | undefined;
+  let withCheck: string | undefined;
+  const usingIdx = rest.toLowerCase().indexOf('using (');
+  if (usingIdx !== -1) {
+    const openParen = rest.indexOf('(', usingIdx);
+    const parsed = extractBalancedParen(rest, openParen);
+    if (parsed) {
+      using = parsed.content;
+      rest = rest.slice(parsed.endIndex).trim();
+    }
+  }
+  const withCheckIdx = rest.toLowerCase().indexOf('with check (');
+  if (withCheckIdx !== -1) {
+    const openParen = rest.indexOf('(', withCheckIdx);
+    const parsed = extractBalancedParen(rest, openParen);
+    if (parsed) {
+      withCheck = parsed.content;
+    }
+  }
+  return {
+    kind: 'CREATE_POLICY',
+    table,
+    name,
+    command,
+    ...(using !== undefined && using !== '' && { using }),
+    ...(withCheck !== undefined && withCheck !== '' && { withCheck }),
+    ...(toRoles !== undefined && toRoles.length > 0 && { to: toRoles })
+  };
+}
+
 const PARSERS: Array<(stmt: string) => SqlOp | null> = [
   parseCreateTable,
   parseAlterTableAddColumn,
@@ -563,7 +666,9 @@ const PARSERS: Array<(stmt: string) => SqlOp | null> = [
   parseSetDropDefault,
   parseAddDropConstraint,
   parseDropColumn,
-  parseDropTable
+  parseDropTable,
+  parseEnableRls,
+  parseCreatePolicy
 ];
 
 export function parseMigrationSql(sql: string): ParseResult {
