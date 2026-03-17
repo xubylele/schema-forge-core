@@ -76,6 +76,9 @@ function policyEquals(oldP: StatePolicy, newP: PolicyNode): boolean {
   if (oldP.command !== newP.command) return false;
   if (normalizePolicyExpression(oldP.using) !== normalizePolicyExpression(newP.using)) return false;
   if (normalizePolicyExpression(oldP.withCheck) !== normalizePolicyExpression(newP.withCheck)) return false;
+  const oldTo = (oldP.to ?? []).slice().sort().join(',');
+  const newTo = (newP.to ?? []).slice().sort().join(',');
+  if (oldTo !== newTo) return false;
   return true;
 }
 

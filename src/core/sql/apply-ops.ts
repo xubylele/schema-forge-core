@@ -207,7 +207,8 @@ export function applySqlOps(ops: SqlOp[]): ApplySqlOpsResult {
           table: op.table,
           command: op.command,
           ...(op.using !== undefined && { using: op.using }),
-          ...(op.withCheck !== undefined && { withCheck: op.withCheck })
+          ...(op.withCheck !== undefined && { withCheck: op.withCheck }),
+          ...(op.to !== undefined && op.to.length > 0 && { to: op.to })
         };
         const existing = table.policies.findIndex(p => p.name === op.name);
         if (existing >= 0) {

@@ -419,7 +419,7 @@ describe('validateSchema', () => {
       };
 
       expect(() => validateSchema(schema)).toThrow(
-        'Policy "Bad policy" on table "users": invalid command "invalid". Expected: select, insert, update, or delete'
+        'Policy "Bad policy" on table "users": invalid command "invalid". Expected: select, insert, update, delete, or all'
       );
     });
 

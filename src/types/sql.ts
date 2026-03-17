@@ -26,6 +26,7 @@ export type SqlOp =
     command: PolicyCommand;
     using?: string;
     withCheck?: string;
+    to?: string[];
   };
 
 export interface ParsedColumn {

@@ -34,6 +34,9 @@ function renderPolicy(policy: PolicyNode): string {
     `policy "${policy.name}" on ${policy.table}`,
     `for ${policy.command}`
   ];
+  if (policy.to !== undefined && policy.to.length > 0) {
+    lines.push(`to ${policy.to.join(' ')}`);
+  }
   if (policy.using !== undefined && policy.using !== '') {
     lines.push(`using ${policy.using}`);
   }

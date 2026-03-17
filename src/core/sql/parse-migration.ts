@@ -597,16 +597,36 @@ function extractBalancedParen(s: string, start: number): { content: string; endI
 
 export function parseCreatePolicy(stmt: string): SqlOp | null {
   const s = stmt.replace(/\s+/g, ' ').trim();
-  const quotedMatch = s.match(/^create\s+policy\s+"([^"]+)"\s+on\s+(\S+)\s+for\s+(select|insert|update|delete)/i);
-  const unquotedMatch = quotedMatch ? null : s.match(/^create\s+policy\s+(\S+)\s+on\s+(\S+)\s+for\s+(select|insert|update|delete)/i);
+  const quotedMatch = s.match(/^create\s+policy\s+"([^"]+)"\s+on\s+(\S+)\s+for\s+(all|select|insert|update|delete)/i);
+  const unquotedMatch = quotedMatch ? null : s.match(/^create\s+policy\s+(\S+)\s+on\s+(\S+)\s+for\s+(all|select|insert|update|delete)/i);
   const match = quotedMatch ?? unquotedMatch;
   if (!match) {
     return null;
   }
   const name = match[1];
   const table = normalizeIdentifier(match[2]);
-  const command = match[3].toLowerCase() as 'select' | 'insert' | 'update' | 'delete';
+  const command = match[3].toLowerCase() as 'all' | 'select' | 'insert' | 'update' | 'delete';
   let rest = s.slice(match[0].length).trim();
+  let toRoles: string[] | undefined;
+  const toMatch = rest.match(/^\s*to\s+/i) ?? rest.match(/\s+to\s+/i);
+  if (toMatch) {
+    const toIdx = toMatch.index!;
+    const afterTo = rest.slice(toIdx + toMatch[0].length);
+    const usingStart = afterTo.toLowerCase().indexOf(' using (');
+    const withCheckStart = afterTo.toLowerCase().indexOf(' with check (');
+    const end = usingStart >= 0 && withCheckStart >= 0
+      ? Math.min(usingStart, withCheckStart)
+      : usingStart >= 0
+        ? usingStart
+        : withCheckStart >= 0
+          ? withCheckStart
+          : afterTo.length;
+    const toPart = afterTo.slice(0, end).trim();
+    if (toPart) {
+      toRoles = toPart.split(/[\s,]+/).map(r => r.trim()).filter(Boolean);
+    }
+    rest = rest.slice(0, toIdx) + rest.slice(toIdx + toMatch[0].length + end);
+  }
   let using: string | undefined;
   let withCheck: string | undefined;
   const usingIdx = rest.toLowerCase().indexOf('using (');
@@ -632,7 +652,8 @@ export function parseCreatePolicy(stmt: string): SqlOp | null {
     name,
     command,
     ...(using !== undefined && using !== '' && { using }),
-    ...(withCheck !== undefined && withCheck !== '' && { withCheck })
+    ...(withCheck !== undefined && withCheck !== '' && { withCheck }),
+    ...(toRoles !== undefined && toRoles.length > 0 && { to: toRoles })
   };
 }
 

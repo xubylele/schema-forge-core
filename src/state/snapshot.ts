@@ -31,6 +31,7 @@ export function createSnapshot(schema: DatabaseSchema): StateFile {
           command: p.command,
           ...(p.using !== undefined && { using: p.using }),
           ...(p.withCheck !== undefined && { withCheck: p.withCheck }),
+          ...(p.to !== undefined && p.to.length > 0 && { to: p.to }),
         };
       }
     }

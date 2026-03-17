@@ -230,8 +230,11 @@ function generateAlterColumnNullability(
 }
 
 function generateCreatePolicy(tableName: string, policy: PolicyNode): string {
-  const command = policy.command.toUpperCase();
+  const command = policy.command === 'all' ? 'ALL' : policy.command.toUpperCase();
   const parts = [`CREATE POLICY "${policy.name}" ON ${tableName} FOR ${command}`];
+  if (policy.to !== undefined && policy.to.length > 0) {
+    parts.push(`TO ${policy.to.join(', ')}`);
+  }
   if (policy.using !== undefined && policy.using !== '') {
     parts.push(`USING (${policy.using})`);
   }

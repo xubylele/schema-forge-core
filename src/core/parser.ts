@@ -7,7 +7,7 @@ import type {
   PolicyNode,
 } from '../types/schema.js';
 
-const POLICY_COMMANDS: PolicyCommand[] = ['select', 'insert', 'update', 'delete'];
+const POLICY_COMMANDS: PolicyCommand[] = ['select', 'insert', 'update', 'delete', 'all'];
 
 /**
  * Parse a schema from DSL source string
@@ -366,6 +366,7 @@ export function parseSchema(source: string): DatabaseSchema {
     let command: PolicyCommand | undefined;
     let using: string | undefined;
     let withCheck: string | undefined;
+    let toRoles: string[] | undefined;
     let lineIdx = startLine + 1;
 
     while (lineIdx < lines.length) {
@@ -377,16 +378,33 @@ export function parseSchema(source: string): DatabaseSchema {
       }
 
       if (cleaned.startsWith('for ')) {
-        const cmd = cleaned.slice(4).trim().toLowerCase();
+        const rest = cleaned.slice(4).trim().toLowerCase();
+        const parts = rest.split(/\s+/);
+        const cmd = parts[0];
         if (!POLICY_COMMANDS.includes(cmd as PolicyCommand)) {
           throw new Error(
-            `Line ${lineIdx + 1}: Invalid policy command '${cmd}'. Expected: select, insert, update, or delete`
+            `Line ${lineIdx + 1}: Invalid policy command '${cmd}'. Expected: select, insert, update, delete, or all`
           );
         }
         if (command !== undefined) {
           throw new Error(`Line ${lineIdx + 1}: Duplicate 'for' in policy`);
         }
         command = cmd as PolicyCommand;
+        if (parts.length > 1 && parts[1] === 'to' && parts.length > 2) {
+          toRoles = parts.slice(2);
+        }
+        lineIdx++;
+        continue;
+      }
+
+      if (cleaned.startsWith('to ')) {
+        if (toRoles !== undefined) {
+          throw new Error(`Line ${lineIdx + 1}: Duplicate 'to' in policy`);
+        }
+        const roles = cleaned.slice(3).trim().split(/\s+/).filter(Boolean);
+        if (roles.length > 0) {
+          toRoles = roles;
+        }
         lineIdx++;
         continue;
       }
@@ -422,6 +440,7 @@ export function parseSchema(source: string): DatabaseSchema {
       command,
       ...(using !== undefined && { using }),
       ...(withCheck !== undefined && { withCheck }),
+      ...(toRoles !== undefined && toRoles.length > 0 && { to: toRoles }),
     };
     return { policy, nextLineIndex: lineIdx };
   }

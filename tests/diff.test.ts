@@ -906,6 +906,50 @@ describe('diffSchemas', () => {
       });
     });
 
+    it('should detect modified policy when to roles change', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: { id: { type: 'uuid', primaryKey: true } },
+            primaryKey: 'id',
+            policies: {
+              users_self_read: { command: 'select', using: 'auth.uid() = id' },
+            },
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            primaryKey: 'id',
+            policies: [
+              {
+                name: 'users_self_read',
+                table: 'users',
+                command: 'select',
+                using: 'auth.uid() = id',
+                to: ['authenticated'],
+              },
+            ],
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+
+      expect(result.operations).toHaveLength(1);
+      expect(result.operations[0]).toMatchObject({
+        kind: 'modify_policy',
+        tableName: 'users',
+        policyName: 'users_self_read',
+        policy: { to: ['authenticated'] },
+      });
+    });
+
     it('should not emit policy op when policies are unchanged', () => {
       const oldState: StateFile = {
         version: 1,

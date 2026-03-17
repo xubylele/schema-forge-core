@@ -9,7 +9,8 @@ const VALID_POLICY_COMMANDS: PolicyCommand[] = [
   'select',
   'insert',
   'update',
-  'delete'
+  'delete',
+  'all'
 ];
 
 /**
@@ -194,7 +195,7 @@ function validatePolicies(schema: DatabaseSchema): void {
 
       if (!VALID_POLICY_COMMANDS.includes(policy.command)) {
         throw new Error(
-          `Policy "${policy.name}" on table "${tableName}": invalid command "${policy.command}". Expected: select, insert, update, or delete`
+          `Policy "${policy.name}" on table "${tableName}": invalid command "${policy.command}". Expected: select, insert, update, delete, or all`
         );
       }
 

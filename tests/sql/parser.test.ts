@@ -192,6 +192,39 @@ describe('parseMigrationSql', () => {
     });
   });
 
+  it('parses CREATE POLICY FOR ALL', () => {
+    const sql = `CREATE POLICY "Own rows" ON public.profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);`;
+    const result = parseMigrationSql(sql);
+
+    expect(result.warnings).toHaveLength(0);
+    expect(result.ops).toHaveLength(1);
+    expect(result.ops[0]).toMatchObject({
+      kind: 'CREATE_POLICY',
+      table: 'profiles',
+      name: 'Own rows',
+      command: 'all',
+      using: 'auth.uid() = id',
+      withCheck: 'auth.uid() = id'
+    });
+  });
+
+  it('parses CREATE POLICY with TO clause', () => {
+    const sql = `CREATE POLICY "Auth write" ON public.posts FOR INSERT TO authenticated USING (true) WITH CHECK (auth.uid() = user_id);`;
+    const result = parseMigrationSql(sql);
+
+    expect(result.warnings).toHaveLength(0);
+    expect(result.ops).toHaveLength(1);
+    expect(result.ops[0]).toMatchObject({
+      kind: 'CREATE_POLICY',
+      table: 'posts',
+      name: 'Auth write',
+      command: 'insert',
+      to: ['authenticated'],
+      using: 'true',
+      withCheck: 'auth.uid() = user_id'
+    });
+  });
+
   it('returns ordered operations across multiple statements', () => {
     const sql = `
       CREATE TABLE public.users (

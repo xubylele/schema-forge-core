@@ -16,7 +16,7 @@ export interface ForeignKey {
   column: string;
 }
 
-export type PolicyCommand = 'select' | 'insert' | 'update' | 'delete';
+export type PolicyCommand = 'select' | 'insert' | 'update' | 'delete' | 'all';
 
 export interface PolicyNode {
   name: string;
@@ -24,12 +24,14 @@ export interface PolicyNode {
   command: PolicyCommand;
   using?: string;
   withCheck?: string;
+  to?: string[];
 }
 
 export interface StatePolicy {
   command: PolicyCommand;
   using?: string;
   withCheck?: string;
+  to?: string[];
 }
 
 export interface Column {

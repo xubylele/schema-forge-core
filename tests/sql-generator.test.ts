@@ -141,6 +141,55 @@ describe('SQL Generator', () => {
       expect(result).toContain('WITH CHECK (auth.uid() = user_id)');
     });
 
+    it('should generate create policy FOR ALL', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_policy',
+            tableName: 'profiles',
+            policy: {
+              name: 'Own rows',
+              table: 'profiles',
+              command: 'all',
+              using: 'auth.uid() = id',
+              withCheck: 'auth.uid() = id',
+            },
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+
+      expect(result).toContain('CREATE POLICY "Own rows" ON profiles FOR ALL');
+      expect(result).toContain('USING (auth.uid() = id)');
+      expect(result).toContain('WITH CHECK (auth.uid() = id)');
+    });
+
+    it('should generate create policy with TO clause', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_policy',
+            tableName: 'posts',
+            policy: {
+              name: 'Auth write',
+              table: 'posts',
+              command: 'insert',
+              to: ['authenticated'],
+              using: 'true',
+              withCheck: 'auth.uid() = user_id',
+            },
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+
+      expect(result).toContain('CREATE POLICY "Auth write" ON posts FOR INSERT TO authenticated');
+      expect(result).toContain('USING (true)');
+      expect(result).toContain('WITH CHECK (auth.uid() = user_id)');
+    });
+
     it('should generate drop policy statement', () => {
       const diff: DiffResult = {
         operations: [
