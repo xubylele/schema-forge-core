@@ -112,29 +112,24 @@ function generateColumnDefinition(
 ): string {
   const parts: string[] = [column.name, column.type];
 
-  // Foreign key inline
   if (column.foreignKey) {
     parts.push(
       `references ${column.foreignKey.table}(${column.foreignKey.column})`
     );
   }
 
-  // Primary key
   if (column.primaryKey) {
     parts.push('primary key');
   }
 
-  // Unique
   if (column.unique) {
     parts.push('unique');
   }
 
-  // Nullable
   if (column.nullable === false) {
     parts.push('not null');
   }
 
-  // Default
   if (column.default !== undefined) {
     parts.push('default ' + column.default);
   } else if (

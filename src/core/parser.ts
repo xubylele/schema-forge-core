@@ -252,7 +252,6 @@ export function parseSchema(source: string): DatabaseSchema {
       nullable: true
     };
 
-    // Parse modifiers
     let i = 2;
     while (i < tokens.length) {
       const modifier = tokens[i];
@@ -468,7 +467,6 @@ export function parseSchema(source: string): DatabaseSchema {
     let lineIdx = startLine + 1;
     let foundClosingBrace = false;
 
-    // Parse columns until we find closing brace
     while (lineIdx < lines.length) {
       const cleaned = cleanLine(lines[lineIdx]);
 
@@ -482,7 +480,6 @@ export function parseSchema(source: string): DatabaseSchema {
         break;
       }
 
-      // This should be a column definition
       try {
         const column = parseColumn(cleaned, lineIdx + 1);
         columns.push(column);
@@ -508,7 +505,6 @@ export function parseSchema(source: string): DatabaseSchema {
     return lineIdx;
   }
 
-  // Main parsing loop
   const policyDeclRegex = /^policy\s+"([^"]*)"\s+on\s+\w+/;
   while (currentLine < lines.length) {
     const cleaned = cleanLine(lines[currentLine]);
@@ -532,7 +528,6 @@ export function parseSchema(source: string): DatabaseSchema {
     }
   }
 
-  // Attach policies to tables
   for (const { policy, startLine } of policyList) {
     if (!tables[policy.table]) {
       throw new Error(

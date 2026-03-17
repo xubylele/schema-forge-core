@@ -112,11 +112,9 @@ export function classifyOperation(operation: Operation): SafetyLevel {
       return classifyTypeChange(operation.fromType, operation.toType);
 
     case 'column_nullability_changed':
-      // Changing nullable to not null is a warning (may fail if nulls exist)
       if (operation.from && !operation.to) {
         return 'WARNING';
       }
-      // Changing not null to nullable is safe
       return 'SAFE';
 
     case 'column_default_changed':
