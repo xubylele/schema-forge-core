@@ -1,5 +1,34 @@
 # @xubylele/schema-forge-core
 
+## 1.6.0
+
+### Minor Changes
+
+- 2a2f167: ✨ feat: add support for indexes in schema management
+
+  - Introduced IndexNode and StateIndex types to represent indexes in the schema.
+  - Implemented index creation and deletion operations in the diffSchemas function.
+  - Enhanced the parser to support index declarations, including unique and expression indexes.
+  - Added validation for indexes to ensure correct definitions and prevent duplicates.
+  - Updated SQL generation to include CREATE and DROP INDEX statements.
+  - Enhanced tests to cover index creation, modification, and validation scenarios.
+
+- 82916b8: ✨ feature: Add migration plan builder for diff preview operations
+
+  - Added a new migration planning layer that transforms diff operations into structured plan entries with deterministic action mapping (+ create/add, ~ modify/change/replace, - drop/delete).
+  - Introduced formatter helpers to output human-readable migration plan lines without requiring SQL execution.
+  - Exposed the new planner APIs from core entrypoints and added tests to validate symbol mapping, metadata output, and operation order consistency with the diff engine.
+  - Updated README "What's New" and documentation with a dedicated Migration Plan Preview section and usage example.
+
+- 7805b19: ✨ feat: add support for PostgreSQL views in schema management
+
+  - Introduced ViewNode and StateView types to represent views in the schema and persisted state.
+  - Implemented create_view, drop_view, and replace_view operations in the diffSchemas function.
+  - Enhanced the parser to support view declarations using the `view <name> as <sql>` syntax.
+  - Added hash-based comparison for view query bodies to detect changes deterministically.
+  - Updated SQL generation to emit CREATE OR REPLACE VIEW and DROP VIEW IF EXISTS statements.
+  - Expanded safety classification and tests to cover view creation, replacement, deletion, and parser/diff/generator behavior.
+
 ## 1.5.0
 
 ### Minor Changes

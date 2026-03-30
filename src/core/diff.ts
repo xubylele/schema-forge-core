@@ -2,13 +2,22 @@ import type {
   Column,
   DatabaseSchema,
   DiffResult,
+  IndexNode,
   Operation,
   PolicyNode,
   StateColumn,
   StateFile,
+  StateIndex,
   StatePolicy,
+  StateView,
+  ViewNode,
 } from '../types/schema.js';
-import { normalizeDefault } from './normalize.js';
+import {
+  deterministicIndexName,
+  hashSqlContent,
+  normalizeDefault,
+  normalizeSqlExpression,
+} from './normalize.js';
 
 /**
  * Extract table names from a stored state file.
@@ -82,6 +91,69 @@ function policyEquals(oldP: StatePolicy, newP: PolicyNode): boolean {
   return true;
 }
 
+function resolveSchemaIndexName(index: IndexNode): string {
+  if (index.name && index.name.trim().length > 0) {
+    return index.name.trim();
+  }
+
+  return deterministicIndexName({
+    table: index.table,
+    columns: index.columns,
+    expression: index.expression,
+  });
+}
+
+function resolveStateIndexName(index: StateIndex): string {
+  if (index.name && index.name.trim().length > 0) {
+    return index.name.trim();
+  }
+
+  return deterministicIndexName({
+    table: index.table,
+    columns: index.columns,
+    expression: index.expression,
+  });
+}
+
+function normalizeIndexWhere(value?: string): string {
+  return normalizeSqlExpression(value);
+}
+
+function normalizeIndexExpression(value?: string): string {
+  return normalizeSqlExpression(value);
+}
+
+function indexesEqual(previous: StateIndex, current: IndexNode): boolean {
+  if (previous.table !== current.table) return false;
+  if ((previous.unique ?? false) !== (current.unique ?? false)) return false;
+
+  if (previous.columns.length !== current.columns.length) return false;
+  for (let index = 0; index < previous.columns.length; index++) {
+    if (previous.columns[index] !== current.columns[index]) {
+      return false;
+    }
+  }
+
+  if (normalizeIndexWhere(previous.where) !== normalizeIndexWhere(current.where)) return false;
+  if (normalizeIndexExpression(previous.expression) !== normalizeIndexExpression(current.expression)) return false;
+
+  return true;
+}
+
+function resolveStateViewHash(view: StateView): string {
+  if (view.hash && view.hash.trim().length > 0) {
+    return view.hash;
+  }
+  return hashSqlContent(view.query);
+}
+
+function resolveSchemaViewHash(view: ViewNode): string {
+  if (view.hash && view.hash.trim().length > 0) {
+    return view.hash;
+  }
+  return hashSqlContent(view.query);
+}
+
 /**
  * Compare a persisted state and a new schema, generating ordered operations.
  */
@@ -100,6 +172,19 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
         kind: 'create_table',
         table: newSchema.tables[tableName],
       });
+
+      const createdTable = newSchema.tables[tableName];
+      const createdIndexes = (createdTable.indexes ?? [])
+        .map(index => ({ ...index, name: resolveSchemaIndexName(index) }))
+        .sort((left, right) => left.name.localeCompare(right.name));
+
+      for (const index of createdIndexes) {
+        operations.push({
+          kind: 'create_index',
+          tableName,
+          index,
+        });
+      }
     }
   }
 
@@ -291,6 +376,77 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
       continue;
     }
 
+    const oldIndexes = oldTable.indexes ?? {};
+    const newIndexesByName = new Map<string, IndexNode>();
+    for (const index of newTable.indexes ?? []) {
+      const resolved = { ...index, name: resolveSchemaIndexName(index) };
+      newIndexesByName.set(resolved.name, resolved);
+    }
+
+    const oldIndexesByName = new Map<string, StateIndex>();
+    for (const oldIndex of Object.values(oldIndexes)) {
+      oldIndexesByName.set(resolveStateIndexName(oldIndex), oldIndex);
+    }
+
+    const oldIndexNames = Array.from(oldIndexesByName.keys()).sort((a, b) => a.localeCompare(b));
+    const newIndexNames = Array.from(newIndexesByName.keys()).sort((a, b) => a.localeCompare(b));
+    const indexDrops: StateIndex[] = [];
+    const indexCreates: IndexNode[] = [];
+
+    for (const oldIndexName of oldIndexNames) {
+      const oldIndex = oldIndexesByName.get(oldIndexName);
+      if (!oldIndex) {
+        continue;
+      }
+      const nextIndex = newIndexesByName.get(oldIndexName);
+
+      if (!nextIndex) {
+        indexDrops.push({ ...oldIndex, name: oldIndexName });
+        continue;
+      }
+
+      if (!indexesEqual(oldIndex, nextIndex)) {
+        indexDrops.push({ ...oldIndex, name: oldIndexName });
+      }
+    }
+
+    for (const newIndexName of newIndexNames) {
+      const newIndex = newIndexesByName.get(newIndexName);
+      if (!newIndex) {
+        continue;
+      }
+
+      const oldIndex = oldIndexesByName.get(newIndexName);
+      if (!oldIndex || !indexesEqual(oldIndex, newIndex)) {
+        indexCreates.push(newIndex);
+      }
+    }
+
+    for (const index of indexDrops) {
+      operations.push({
+        kind: 'drop_index',
+        tableName,
+        index,
+      });
+    }
+
+    for (const index of indexCreates) {
+      operations.push({
+        kind: 'create_index',
+        tableName,
+        index,
+      });
+    }
+  }
+
+  for (const tableName of commonTableNames) {
+    const newTable = newSchema.tables[tableName];
+    const oldTable = oldState.tables[tableName];
+
+    if (!newTable || !oldTable) {
+      continue;
+    }
+
     const newColumnNames = getColumnNamesFromSchema(newTable.columns);
 
     for (const columnName of Object.keys(oldTable.columns)) {
@@ -335,6 +491,42 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
       if (!newPolicyNames.has(policyName)) {
         operations.push({ kind: 'drop_policy', tableName, policyName });
       }
+    }
+  }
+
+  const oldViews = oldState.views ?? {};
+  const newViews = newSchema.views ?? {};
+  const oldViewNames = Object.keys(oldViews).sort((a, b) => a.localeCompare(b));
+  const newViewNames = Object.keys(newViews).sort((a, b) => a.localeCompare(b));
+  const oldViewNameSet = new Set(oldViewNames);
+  const newViewNameSet = new Set(newViewNames);
+
+  for (const viewName of newViewNames) {
+    const nextView = newViews[viewName];
+    if (!nextView) {
+      continue;
+    }
+
+    if (!oldViewNameSet.has(viewName)) {
+      operations.push({ kind: 'create_view', view: nextView });
+      continue;
+    }
+
+    const prevView = oldViews[viewName];
+    if (!prevView) {
+      continue;
+    }
+
+    const oldHash = resolveStateViewHash(prevView);
+    const newHash = resolveSchemaViewHash(nextView);
+    if (oldHash !== newHash) {
+      operations.push({ kind: 'replace_view', view: nextView });
+    }
+  }
+
+  for (const viewName of oldViewNames) {
+    if (!newViewNameSet.has(viewName)) {
+      operations.push({ kind: 'drop_view', viewName });
     }
   }
 

@@ -419,6 +419,60 @@ describe('SQL Generator', () => {
       expect(parts[0]).toContain('CREATE TABLE posts');
       expect(parts[1]).toBe('DROP TABLE old_posts;');
     });
+
+    it('should generate create view statement as CREATE OR REPLACE VIEW', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_view',
+            view: {
+              name: 'user_posts',
+              query: 'select * from posts where user_id = auth.uid()',
+              hash: 'abc123',
+            },
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+      expect(result).toBe(
+        'CREATE OR REPLACE VIEW user_posts AS\nselect * from posts where user_id = auth.uid();'
+      );
+    });
+
+    it('should generate replace view statement as CREATE OR REPLACE VIEW', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'replace_view',
+            view: {
+              name: 'user_posts',
+              query: 'select id, title from posts where user_id = auth.uid()',
+              hash: 'def456',
+            },
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+      expect(result).toBe(
+        'CREATE OR REPLACE VIEW user_posts AS\nselect id, title from posts where user_id = auth.uid();'
+      );
+    });
+
+    it('should generate drop view statement', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'drop_view',
+            viewName: 'user_posts',
+          },
+        ],
+      };
+
+      const result = generateSql(diff, 'postgres');
+      expect(result).toBe('DROP VIEW IF EXISTS user_posts;');
+    });
   });
 
   describe('Create Table with Column Types', () => {
@@ -1107,6 +1161,71 @@ describe('SQL Generator', () => {
       };
 
       expect(generateSql(diff, 'postgres')).toBe(generateSql(diff, 'postgres'));
+    });
+
+    it('should generate create index SQL', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_index',
+            tableName: 'users',
+            index: {
+              name: 'idx_users_email',
+              table: 'users',
+              columns: ['email'],
+              unique: false,
+            },
+          },
+        ],
+      };
+
+      expect(generateSql(diff, 'postgres')).toBe(
+        'CREATE INDEX idx_users_email ON users (email);'
+      );
+    });
+
+    it('should generate create unique partial expression index SQL', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_index',
+            tableName: 'users',
+            index: {
+              name: 'idx_users_lower_email',
+              table: 'users',
+              columns: [],
+              unique: true,
+              expression: 'lower(email)',
+              where: 'deleted_at is null',
+            },
+          },
+        ],
+      };
+
+      expect(generateSql(diff, 'postgres')).toBe(
+        'CREATE UNIQUE INDEX idx_users_lower_email ON users (lower(email)) WHERE deleted_at is null;'
+      );
+    });
+
+    it('should generate drop index SQL with deterministic fallback', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'drop_index',
+            tableName: 'users',
+            index: {
+              name: 'idx_users_email',
+              table: 'users',
+              columns: ['email'],
+              unique: false,
+            },
+          },
+        ],
+      };
+
+      expect(generateSql(diff, 'postgres')).toBe(
+        'DROP INDEX IF EXISTS idx_users_email;'
+      );
     });
   });
 });

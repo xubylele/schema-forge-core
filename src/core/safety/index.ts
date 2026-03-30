@@ -21,8 +21,11 @@ export type DestructiveOperationCode =
   | 'DROP_COLUMN'
   | 'ALTER_COLUMN_TYPE'
   | 'SET_NOT_NULL'
+  | 'DROP_INDEX'
   | 'DROP_POLICY'
-  | 'MODIFY_POLICY';
+  | 'MODIFY_POLICY'
+  | 'DROP_VIEW'
+  | 'REPLACE_VIEW';
 
 /**
  * Finding represents a detected issue or classification of an operation.

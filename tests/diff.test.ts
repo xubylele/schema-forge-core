@@ -1028,4 +1028,238 @@ describe('diffSchemas', () => {
       expect(policyOps(first)).toEqual(policyOps(second));
     });
   });
+
+  describe('index diff', () => {
+    it('detects index creation on existing table', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: {
+              id: { type: 'uuid', primaryKey: true },
+              email: { type: 'text' },
+            },
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'uuid', primaryKey: true },
+              { name: 'email', type: 'text' },
+            ],
+            indexes: [
+              {
+                name: 'idx_users_email',
+                table: 'users',
+                columns: ['email'],
+                unique: false,
+              },
+            ],
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      expect(result.operations).toContainEqual({
+        kind: 'create_index',
+        tableName: 'users',
+        index: {
+          name: 'idx_users_email',
+          table: 'users',
+          columns: ['email'],
+          unique: false,
+        },
+      });
+    });
+
+    it('detects index removal', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: {
+              id: { type: 'uuid', primaryKey: true },
+              email: { type: 'text' },
+            },
+            indexes: {
+              idx_users_email: {
+                name: 'idx_users_email',
+                table: 'users',
+                columns: ['email'],
+                unique: false,
+              },
+            },
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'uuid', primaryKey: true },
+              { name: 'email', type: 'text' },
+            ],
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      expect(result.operations).toContainEqual({
+        kind: 'drop_index',
+        tableName: 'users',
+        index: {
+          name: 'idx_users_email',
+          table: 'users',
+          columns: ['email'],
+          unique: false,
+        },
+      });
+    });
+
+    it('represents index modification as drop then create', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {
+          users: {
+            columns: {
+              id: { type: 'uuid', primaryKey: true },
+              email: { type: 'text' },
+            },
+            indexes: {
+              idx_users_email: {
+                name: 'idx_users_email',
+                table: 'users',
+                columns: ['email'],
+                unique: false,
+              },
+            },
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'uuid', primaryKey: true },
+              { name: 'email', type: 'text' },
+            ],
+            indexes: [
+              {
+                name: 'idx_users_email',
+                table: 'users',
+                columns: ['email'],
+                unique: true,
+                where: 'email is not null',
+              },
+            ],
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      const dropIndexPos = result.operations.findIndex(
+        operation => operation.kind === 'drop_index' && operation.tableName === 'users'
+      );
+      const createIndexPos = result.operations.findIndex(
+        operation => operation.kind === 'create_index' && operation.tableName === 'users'
+      );
+
+      expect(dropIndexPos).toBeGreaterThanOrEqual(0);
+      expect(createIndexPos).toBeGreaterThanOrEqual(0);
+      expect(dropIndexPos).toBeLessThan(createIndexPos);
+    });
+  });
+
+  describe('view diff', () => {
+    it('detects view creation', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {},
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {},
+        views: {
+          user_posts: {
+            name: 'user_posts',
+            query: 'select * from posts where user_id = auth.uid()',
+            hash: 'abc123',
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      expect(result.operations).toEqual([
+        {
+          kind: 'create_view',
+          view: newSchema.views!.user_posts,
+        },
+      ]);
+    });
+
+    it('detects view replacement when hash changes', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {},
+        views: {
+          user_posts: {
+            query: 'select * from posts where user_id = auth.uid()',
+            hash: 'old_hash',
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {},
+        views: {
+          user_posts: {
+            name: 'user_posts',
+            query: 'select id, title from posts where user_id = auth.uid()',
+            hash: 'new_hash',
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      expect(result.operations).toEqual([
+        {
+          kind: 'replace_view',
+          view: newSchema.views!.user_posts,
+        },
+      ]);
+    });
+
+    it('detects view drop', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {},
+        views: {
+          user_posts: {
+            query: 'select * from posts',
+            hash: 'abc123',
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {},
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      expect(result.operations).toEqual([
+        {
+          kind: 'drop_view',
+          viewName: 'user_posts',
+        },
+      ]);
+    });
+  });
 });

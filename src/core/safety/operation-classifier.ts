@@ -129,6 +129,12 @@ export function classifyOperation(operation: Operation): SafetyLevel {
     case 'add_primary_key_constraint':
       return 'SAFE';
 
+    case 'create_index':
+      return 'SAFE';
+
+    case 'drop_index':
+      return 'WARNING';
+
     case 'create_policy':
       return 'SAFE';
 
@@ -136,6 +142,15 @@ export function classifyOperation(operation: Operation): SafetyLevel {
       return 'DESTRUCTIVE';
 
     case 'modify_policy':
+      return 'WARNING';
+
+    case 'create_view':
+      return 'SAFE';
+
+    case 'drop_view':
+      return 'DESTRUCTIVE';
+
+    case 'replace_view':
       return 'WARNING';
 
     default:

@@ -157,6 +157,15 @@ export function checkOperationSafety(operation: Operation): Finding | null {
         operationKind: operation.kind,
       };
 
+    case 'drop_index':
+      return {
+        safetyLevel,
+        code: 'DROP_INDEX',
+        table: operation.tableName,
+        message: `Index '${operation.index.name}' removed`,
+        operationKind: operation.kind,
+      };
+
     case 'drop_policy':
       return {
         safetyLevel,
@@ -172,6 +181,24 @@ export function checkOperationSafety(operation: Operation): Finding | null {
         code: 'MODIFY_POLICY',
         table: operation.tableName,
         message: 'Policy expression changed',
+        operationKind: operation.kind,
+      };
+
+    case 'drop_view':
+      return {
+        safetyLevel,
+        code: 'DROP_VIEW',
+        table: operation.viewName,
+        message: 'View removed',
+        operationKind: operation.kind,
+      };
+
+    case 'replace_view':
+      return {
+        safetyLevel,
+        code: 'REPLACE_VIEW',
+        table: operation.view.name,
+        message: 'View definition changed',
         operationKind: operation.kind,
       };
 

@@ -78,6 +78,21 @@ describe('classifyOperation', () => {
       expect(classifyOperation(operation)).toBe('SAFE');
     });
 
+    it('classifies create_index as SAFE', () => {
+      const operation: Operation = {
+        kind: 'create_index',
+        tableName: 'users',
+        index: {
+          name: 'idx_users_email',
+          table: 'users',
+          columns: ['email'],
+          unique: false,
+        },
+      };
+
+      expect(classifyOperation(operation)).toBe('SAFE');
+    });
+
     it('classifies column_nullability_changed (not null to nullable) as SAFE', () => {
       const operation: Operation = {
         kind: 'column_nullability_changed',
@@ -192,6 +207,21 @@ describe('classifyOperation', () => {
   });
 
   describe('WARNING operations', () => {
+    it('classifies drop_index as WARNING', () => {
+      const operation: Operation = {
+        kind: 'drop_index',
+        tableName: 'users',
+        index: {
+          name: 'idx_users_email',
+          table: 'users',
+          columns: ['email'],
+          unique: false,
+        },
+      };
+
+      expect(classifyOperation(operation)).toBe('WARNING');
+    });
+
     it('classifies column_nullability_changed (nullable to not null) as WARNING', () => {
       const operation: Operation = {
         kind: 'column_nullability_changed',
@@ -313,6 +343,41 @@ describe('classifyOperation', () => {
         columnName: 'price',
         fromType: 'NUMERIC ( 5 , 2 )',
         toType: 'numeric(10,2)',
+      };
+
+      expect(classifyOperation(operation)).toBe('WARNING');
+    });
+
+    it('classifies create_view as SAFE', () => {
+      const operation: Operation = {
+        kind: 'create_view',
+        view: {
+          name: 'user_posts',
+          query: 'select * from posts',
+          hash: 'abc123',
+        },
+      };
+
+      expect(classifyOperation(operation)).toBe('SAFE');
+    });
+
+    it('classifies drop_view as DESTRUCTIVE', () => {
+      const operation: Operation = {
+        kind: 'drop_view',
+        viewName: 'user_posts',
+      };
+
+      expect(classifyOperation(operation)).toBe('DESTRUCTIVE');
+    });
+
+    it('classifies replace_view as WARNING', () => {
+      const operation: Operation = {
+        kind: 'replace_view',
+        view: {
+          name: 'user_posts',
+          query: 'select id from posts',
+          hash: 'def456',
+        },
       };
 
       expect(classifyOperation(operation)).toBe('WARNING');

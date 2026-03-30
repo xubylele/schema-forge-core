@@ -1,5 +1,20 @@
-import { legacyPkName, legacyUqName, pkName, uqName } from '../core/normalize.js';
-import type { Column, DiffResult, Operation, PolicyNode, Table } from '../types/schema.js';
+import {
+  deterministicIndexName,
+  legacyPkName,
+  legacyUqName,
+  pkName,
+  uqName,
+} from '../core/normalize.js';
+import type {
+  Column,
+  DiffResult,
+  IndexNode,
+  Operation,
+  PolicyNode,
+  StateIndex,
+  Table,
+  ViewNode,
+} from '../types/schema.js';
 
 export type Provider = 'supabase' | 'postgres';
 
@@ -77,13 +92,52 @@ function generateOperation(
       return generateDropPrimaryKeyConstraint(operation.tableName);
     case 'add_primary_key_constraint':
       return generateAddPrimaryKeyConstraint(operation.tableName, operation.columnName);
+    case 'create_index':
+      return generateCreateIndex(operation.tableName, operation.index);
+    case 'drop_index':
+      return generateDropIndex(operation.tableName, operation.index);
     case 'create_policy':
       return generateCreatePolicy(operation.tableName, operation.policy);
     case 'drop_policy':
       return generateDropPolicy(operation.tableName, operation.policyName);
+    case 'create_view':
+      return generateCreateOrReplaceView(operation.view);
+    case 'drop_view':
+      return generateDropView(operation.viewName);
+    case 'replace_view':
+      return generateCreateOrReplaceView(operation.view);
     case 'modify_policy':
       return generateModifyPolicy(operation.tableName, operation.policyName, operation.policy);
   }
+}
+
+function generateCreateOrReplaceView(view: ViewNode): string {
+  return `CREATE OR REPLACE VIEW ${view.name} AS\n${view.query};`;
+}
+
+function generateDropView(viewName: string): string {
+  return `DROP VIEW IF EXISTS ${viewName};`;
+}
+
+function generateCreateIndex(tableName: string, index: IndexNode): string {
+  const uniqueToken = index.unique ? 'UNIQUE ' : '';
+  const payload = index.expression
+    ? `(${index.expression})`
+    : `(${index.columns.join(', ')})`;
+  const whereClause = index.where ? ` WHERE ${index.where}` : '';
+
+  return `CREATE ${uniqueToken}INDEX ${index.name} ON ${tableName} ${payload}${whereClause};`;
+}
+
+function generateDropIndex(tableName: string, index: StateIndex): string {
+  const fallbackName = deterministicIndexName({
+    table: tableName,
+    columns: index.columns,
+    expression: index.expression,
+  });
+
+  const indexNames = Array.from(new Set([index.name, fallbackName]));
+  return indexNames.map(indexName => `DROP INDEX IF EXISTS ${indexName};`).join('\n');
 }
 
 function generateCreateTable(

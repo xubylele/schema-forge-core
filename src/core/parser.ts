@@ -3,9 +3,12 @@ import type {
   ColumnType,
   DatabaseSchema,
   ForeignKey,
+  IndexNode,
   PolicyCommand,
   PolicyNode,
+  ViewNode,
 } from '../types/schema.js';
+import { deterministicIndexName, hashSqlContent, normalizeSqlExpression } from './normalize.js';
 
 const POLICY_COMMANDS: PolicyCommand[] = ['select', 'insert', 'update', 'delete', 'all'];
 
@@ -39,9 +42,17 @@ export function parseSchema(source: string): DatabaseSchema {
   const lines = source.split('\n');
   const tables: Record<
     string,
-    { name: string; columns: Column[]; primaryKey?: string | null; policies?: PolicyNode[] }
+    {
+      name: string;
+      columns: Column[];
+      primaryKey?: string | null;
+      indexes?: IndexNode[];
+      policies?: PolicyNode[];
+    }
   > = {};
   const policyList: { policy: PolicyNode; startLine: number }[] = [];
+  const indexList: { index: IndexNode; startLine: number }[] = [];
+  const viewList: { view: ViewNode; startLine: number }[] = [];
 
   let currentLine = 0;
 
@@ -82,7 +93,7 @@ export function parseSchema(source: string): DatabaseSchema {
     return false;
   }
 
-  function validateIdentifier(identifier: string, lineNum: number, context: 'table' | 'column' | 'foreign key table' | 'foreign key column'): void {
+  function validateIdentifier(identifier: string, lineNum: number, context: 'table' | 'column' | 'foreign key table' | 'foreign key column' | 'view'): void {
     if (!validIdentifierPattern.test(identifier)) {
       throw new Error(
         `Line ${lineNum}: Invalid ${context} name '${identifier}'. Use letters, numbers, and underscores, and do not start with a number.`
@@ -444,6 +455,69 @@ export function parseSchema(source: string): DatabaseSchema {
     return { policy, nextLineIndex: lineIdx };
   }
 
+  const policyDeclRegex = /^policy\s+"([^"]*)"\s+on\s+\w+/;
+
+  function parseViewDeclaration(
+    startLine: number,
+    options?: { stopAtTableClose?: boolean }
+  ): { view: ViewNode; nextLineIndex: number } {
+    const firstLine = cleanLine(lines[startLine]);
+    const declMatch = firstLine.match(/^view\s+(\w+)\s+as(?:\s+([\s\S]+))?$/);
+
+    if (!declMatch) {
+      throw new Error(`Line ${startLine + 1}: Invalid view declaration. Expected: view <name> as <sql>`);
+    }
+
+    const viewName = declMatch[1];
+    validateIdentifier(viewName, startLine + 1, 'view');
+
+    const queryLines: string[] = [];
+    const inlineQuery = declMatch[2]?.trim();
+    if (inlineQuery) {
+      queryLines.push(inlineQuery);
+    }
+
+    let lineIdx = startLine + 1;
+    while (lineIdx < lines.length) {
+      const rawLine = lines[lineIdx];
+      const cleaned = cleanLine(rawLine);
+
+      if (!cleaned) {
+        if (queryLines.length > 0) {
+          queryLines.push('');
+        }
+        lineIdx++;
+        continue;
+      }
+
+      if (
+        cleaned.startsWith('table ') ||
+        policyDeclRegex.test(cleaned) ||
+        cleaned.startsWith('index ') ||
+        cleaned.startsWith('view ') ||
+        (options?.stopAtTableClose === true && cleaned === '}')
+      ) {
+        break;
+      }
+
+      queryLines.push(rawLine.trim());
+      lineIdx++;
+    }
+
+    const query = queryLines.join('\n').trim();
+    if (!query) {
+      throw new Error(`Line ${startLine + 1}: View '${viewName}' is missing SQL query body`);
+    }
+
+    const view: ViewNode = {
+      name: viewName,
+      query,
+      hash: hashSqlContent(query),
+    };
+
+    return { view, nextLineIndex: lineIdx };
+  }
+
   /**
    * Parse a table block
    */
@@ -480,6 +554,13 @@ export function parseSchema(source: string): DatabaseSchema {
         break;
       }
 
+      if (cleaned.startsWith('view ')) {
+        const { view, nextLineIndex } = parseViewDeclaration(lineIdx, { stopAtTableClose: true });
+        viewList.push({ view, startLine: lineIdx + 1 });
+        lineIdx = nextLineIndex;
+        continue;
+      }
+
       try {
         const column = parseColumn(cleaned, lineIdx + 1);
         columns.push(column);
@@ -505,7 +586,166 @@ export function parseSchema(source: string): DatabaseSchema {
     return lineIdx;
   }
 
-  const policyDeclRegex = /^policy\s+"([^"]*)"\s+on\s+\w+/;
+  function parseIndexColumns(columnsRaw: string, lineNum: number): string[] {
+    const parsed = columnsRaw
+      .split(',')
+      .map(column => column.trim())
+      .filter(Boolean);
+
+    if (parsed.length === 0) {
+      throw new Error(`Line ${lineNum}: Index columns clause requires at least one column`);
+    }
+
+    for (const column of parsed) {
+      validateIdentifier(column, lineNum, 'column');
+    }
+
+    return parsed;
+  }
+
+  function parseIndexDeclaration(startLine: number): { index: IndexNode; nextLineIndex: number } {
+    const firstLine = cleanLine(lines[startLine]);
+
+    const inlineExprMatch = firstLine.match(/^index(?:\s+(\w+))?\s+on\s+(\w+)\s*\((.+)\)\s*$/);
+    if (inlineExprMatch) {
+      const name = inlineExprMatch[1];
+      const table = inlineExprMatch[2];
+      const expressionRaw = inlineExprMatch[3].trim();
+
+      if (name) {
+        validateIdentifier(name, startLine + 1, 'column');
+      }
+      validateIdentifier(table, startLine + 1, 'table');
+
+      if (!expressionRaw) {
+        throw new Error(`Line ${startLine + 1}: Expression index requires a non-empty expression`);
+      }
+
+      const normalizedExpression = normalizeSqlExpression(expressionRaw);
+      const resolvedName = name ?? deterministicIndexName({ table, expression: normalizedExpression });
+
+      return {
+        index: {
+          name: resolvedName,
+          table,
+          columns: [],
+          unique: false,
+          expression: normalizedExpression,
+        },
+        nextLineIndex: startLine + 1,
+      };
+    }
+
+    const blockMatch = firstLine.match(/^index(?:\s+(\w+))?\s+on\s+(\w+)\s*$/);
+    if (!blockMatch) {
+      throw new Error(
+        `Line ${startLine + 1}: Invalid index declaration. Expected: index [name] on <table> or index [name] on <table>(<expression>)`
+      );
+    }
+
+    const declaredName = blockMatch[1];
+    const table = blockMatch[2];
+
+    if (declaredName) {
+      validateIdentifier(declaredName, startLine + 1, 'column');
+    }
+    validateIdentifier(table, startLine + 1, 'table');
+
+    let lineIdx = startLine + 1;
+    let columns: string[] | undefined;
+    let unique = false;
+    let where: string | undefined;
+    let expression: string | undefined;
+    const seenClauses = new Set<string>();
+
+    while (lineIdx < lines.length) {
+      const cleaned = cleanLine(lines[lineIdx]);
+
+      if (!cleaned) {
+        lineIdx++;
+        continue;
+      }
+
+      if (
+        cleaned.startsWith('table ') ||
+        cleaned.startsWith('policy ') ||
+        cleaned.startsWith('index ')
+      ) {
+        break;
+      }
+
+      if (cleaned === 'unique') {
+        if (seenClauses.has('unique')) {
+          throw new Error(`Line ${lineIdx + 1}: Duplicate 'unique' in index declaration`);
+        }
+        seenClauses.add('unique');
+        unique = true;
+        lineIdx++;
+        continue;
+      }
+
+      if (cleaned.startsWith('columns ')) {
+        if (seenClauses.has('columns')) {
+          throw new Error(`Line ${lineIdx + 1}: Duplicate 'columns' in index declaration`);
+        }
+        seenClauses.add('columns');
+        columns = parseIndexColumns(cleaned.slice('columns '.length), lineIdx + 1);
+        lineIdx++;
+        continue;
+      }
+
+      if (cleaned.startsWith('where ')) {
+        if (seenClauses.has('where')) {
+          throw new Error(`Line ${lineIdx + 1}: Duplicate 'where' in index declaration`);
+        }
+        seenClauses.add('where');
+        where = normalizeSqlExpression(cleaned.slice('where '.length));
+        lineIdx++;
+        continue;
+      }
+
+      if (cleaned.startsWith('expression ')) {
+        if (seenClauses.has('expression')) {
+          throw new Error(`Line ${lineIdx + 1}: Duplicate 'expression' in index declaration`);
+        }
+        seenClauses.add('expression');
+        expression = normalizeSqlExpression(cleaned.slice('expression '.length));
+        lineIdx++;
+        continue;
+      }
+
+      throw new Error(`Line ${lineIdx + 1}: Unexpected index clause '${cleaned}'`);
+    }
+
+    if ((columns && expression) || (!columns && !expression)) {
+      throw new Error(
+        `Line ${startLine + 1}: Index must define exactly one target kind: either 'columns' or 'expression'`
+      );
+    }
+
+    if (expression !== undefined && expression.trim().length === 0) {
+      throw new Error(`Line ${startLine + 1}: Expression index requires a non-empty expression`);
+    }
+
+    const resolvedName = declaredName ?? deterministicIndexName({
+      table,
+      columns,
+      expression,
+    });
+
+    return {
+      index: {
+        name: resolvedName,
+        table,
+        columns: columns ?? [],
+        unique,
+        ...(where !== undefined && { where }),
+        ...(expression !== undefined && { expression }),
+      },
+      nextLineIndex: lineIdx,
+    };
+  }
+
   while (currentLine < lines.length) {
     const cleaned = cleanLine(lines[currentLine]);
 
@@ -521,11 +761,33 @@ export function parseSchema(source: string): DatabaseSchema {
       const { policy, nextLineIndex } = parsePolicyBlock(currentLine);
       policyList.push({ policy, startLine: currentLine + 1 });
       currentLine = nextLineIndex;
+    } else if (cleaned.startsWith('index ')) {
+      const { index, nextLineIndex } = parseIndexDeclaration(currentLine);
+      indexList.push({ index, startLine: currentLine + 1 });
+      currentLine = nextLineIndex;
+    } else if (cleaned.startsWith('view ')) {
+      const { view, nextLineIndex } = parseViewDeclaration(currentLine);
+      viewList.push({ view, startLine: currentLine + 1 });
+      currentLine = nextLineIndex;
     } else {
       throw new Error(
-        `Line ${currentLine + 1}: Unexpected content '${cleaned}'. Expected table or policy definition.`
+        `Line ${currentLine + 1}: Unexpected content '${cleaned}'. Expected table, index, view, or policy definition.`
       );
     }
+  }
+
+  for (const { index, startLine } of indexList) {
+    if (!tables[index.table]) {
+      throw new Error(
+        `Line ${startLine}: Index "${index.name}" references undefined table "${index.table}"`
+      );
+    }
+
+    if (!tables[index.table].indexes) {
+      tables[index.table].indexes = [];
+    }
+
+    tables[index.table].indexes!.push(index);
   }
 
   for (const { policy, startLine } of policyList) {
@@ -540,5 +802,16 @@ export function parseSchema(source: string): DatabaseSchema {
     tables[policy.table].policies!.push(policy);
   }
 
-  return { tables };
+  const views: Record<string, ViewNode> = {};
+  for (const { view, startLine } of viewList) {
+    if (views[view.name]) {
+      throw new Error(`Line ${startLine}: Duplicate view definition '${view.name}'`);
+    }
+    views[view.name] = view;
+  }
+
+  return {
+    tables,
+    ...(Object.keys(views).length > 0 && { views }),
+  };
 }

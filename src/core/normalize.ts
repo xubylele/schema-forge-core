@@ -26,6 +26,50 @@ export function legacyUqName(table: string, column: string): string {
   return `${normalizeIdent(table)}_${normalizeIdent(column)}_key`;
 }
 
+function simpleHash(input: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index++) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+export function hashSqlContent(value: string): string {
+  return simpleHash(value);
+}
+
+export function normalizeSqlExpression(value: string | undefined): string {
+  if (!value) {
+    return '';
+  }
+
+  return normalizeSpacesOutsideQuotes(value);
+}
+
+export function deterministicIndexName(params: {
+  table: string;
+  columns?: string[];
+  expression?: string;
+}): string {
+  const tableName = normalizeIdent(params.table) || 'table';
+  const columnList = params.columns ?? [];
+
+  if (columnList.length > 0) {
+    const columnToken = columnList
+      .map(column => normalizeIdent(column) || 'col')
+      .join('_')
+      .slice(0, 40);
+    return `idx_${tableName}_${columnToken}`;
+  }
+
+  const normalizedExpression = normalizeSqlExpression(params.expression);
+  const identExpr = normalizeIdent(normalizedExpression).slice(0, 24) || 'expr';
+  const hash = simpleHash(normalizedExpression || params.expression || '').slice(0, 8);
+  return `idx_${tableName}_${identExpr}_${hash}`;
+}
+
 function normalizeSpacesOutsideQuotes(value: string): string {
   let result = '';
   let inSingleQuote = false;

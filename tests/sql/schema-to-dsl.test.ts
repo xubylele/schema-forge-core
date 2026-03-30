@@ -79,4 +79,43 @@ describe('schemaToDsl', () => {
 
     expect(dsl).toContain('to anon authenticated');
   });
+
+  it('emits indexes in canonical order and format', () => {
+    const schema: DatabaseSchema = {
+      tables: {
+        users: {
+          name: 'users',
+          columns: [
+            { name: 'id', type: 'uuid', primaryKey: true },
+            { name: 'email', type: 'text' },
+            { name: 'org_id', type: 'uuid' },
+          ],
+          indexes: [
+            {
+              name: 'idx_users_lower_email',
+              table: 'users',
+              columns: [],
+              unique: false,
+              expression: 'lower(email)',
+            },
+            {
+              name: 'idx_users_org_email',
+              table: 'users',
+              columns: ['org_id', 'email'],
+              unique: true,
+              where: 'deleted_at is null',
+            },
+          ],
+        },
+      },
+    };
+
+    const dsl = schemaToDsl(schema);
+    expect(dsl).toContain('index idx_users_lower_email on users\nexpression lower(email)');
+    expect(dsl).toContain('index idx_users_org_email on users\ncolumns org_id, email\nunique\nwhere deleted_at is null');
+
+    const firstPos = dsl.indexOf('index idx_users_lower_email on users');
+    const secondPos = dsl.indexOf('index idx_users_org_email on users');
+    expect(firstPos).toBeLessThan(secondPos);
+  });
 });

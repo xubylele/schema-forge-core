@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { deterministicIndexName } from '../src/core/normalize';
 import { parseSchema } from '../src/core/parser';
 
 describe('parseSchema', () => {
@@ -837,6 +838,215 @@ describe('parseSchema', () => {
       `;
 
       expect(() => parseSchema(source)).toThrow(/Duplicate 'for' in policy/);
+    });
+  });
+
+  describe('index parsing', () => {
+    it('should parse basic index block with columns', () => {
+      const source = `
+        table users {
+          id uuid pk
+          email text
+        }
+
+        index idx_users_email on users
+        columns email
+      `;
+
+      const result = parseSchema(source);
+      expect(result.tables.users.indexes).toHaveLength(1);
+      expect(result.tables.users.indexes![0]).toEqual({
+        name: 'idx_users_email',
+        table: 'users',
+        columns: ['email'],
+        unique: false,
+      });
+    });
+
+    it('should parse unique multi-column partial index', () => {
+      const source = `
+        table users {
+          id uuid pk
+          org_id uuid
+          email text
+          deleted_at timestamptz nullable
+        }
+
+        index idx_users_org_email on users
+        columns org_id, email
+        unique
+        where deleted_at is null
+      `;
+
+      const result = parseSchema(source);
+      expect(result.tables.users.indexes![0]).toEqual({
+        name: 'idx_users_org_email',
+        table: 'users',
+        columns: ['org_id', 'email'],
+        unique: true,
+        where: 'deleted_at is null',
+      });
+    });
+
+    it('should parse expression index block style', () => {
+      const source = `
+        table users {
+          id uuid pk
+          email text
+        }
+
+        index idx_users_lower_email on users
+        expression lower(email)
+      `;
+
+      const result = parseSchema(source);
+      expect(result.tables.users.indexes![0]).toEqual({
+        name: 'idx_users_lower_email',
+        table: 'users',
+        columns: [],
+        unique: false,
+        expression: 'lower(email)',
+      });
+    });
+
+    it('should parse expression index inline on syntax', () => {
+      const source = `
+        table users {
+          id uuid pk
+          email text
+        }
+
+        index idx_users_lower_email on users(lower(email))
+      `;
+
+      const result = parseSchema(source);
+      expect(result.tables.users.indexes![0]).toEqual({
+        name: 'idx_users_lower_email',
+        table: 'users',
+        columns: [],
+        unique: false,
+        expression: 'lower(email)',
+      });
+    });
+
+    it('should deterministically name index when name is omitted', () => {
+      const source = `
+        table users {
+          id uuid pk
+          email text
+        }
+
+        index on users
+        columns email
+      `;
+
+      const result = parseSchema(source);
+      expect(result.tables.users.indexes).toHaveLength(1);
+      expect(result.tables.users.indexes![0].name).toBe(
+        deterministicIndexName({ table: 'users', columns: ['email'] })
+      );
+    });
+
+    it('should throw on duplicate index clause', () => {
+      const source = `
+        table users {
+          id uuid pk
+          email text
+        }
+
+        index idx_users_email on users
+        columns email
+        columns id
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/Duplicate 'columns'/);
+    });
+
+    it('should throw when both columns and expression are provided', () => {
+      const source = `
+        table users {
+          id uuid pk
+          email text
+        }
+
+        index idx_users_email_expr on users
+        columns email
+        expression lower(email)
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/exactly one target kind/);
+    });
+
+    it('should throw when index references unknown table', () => {
+      const source = `
+        table users {
+          id uuid pk
+          email text
+        }
+
+        index idx_missing_table on accounts
+        columns email
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/references undefined table/);
+    });
+  });
+
+  describe('view parsing', () => {
+    it('should parse top-level view and store raw query body with hash', () => {
+      const source = `
+        table posts {
+          id uuid pk
+          user_id uuid
+        }
+
+        view user_posts as
+        select * from posts where user_id = auth.uid()
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.views).toBeDefined();
+      expect(result.views).toHaveProperty('user_posts');
+      expect(result.views!.user_posts.query).toBe('select * from posts where user_id = auth.uid()');
+      expect(result.views!.user_posts.hash).toMatch(/^[a-z0-9]+$/i);
+    });
+
+    it('should parse view declared inside table block and model as global view', () => {
+      const source = `
+        table posts {
+          id uuid pk
+          user_id uuid
+
+          view user_posts as
+          select * from posts where user_id = auth.uid()
+        }
+      `;
+
+      const result = parseSchema(source);
+      expect(result.tables.posts.columns).toHaveLength(2);
+      expect(result.views).toBeDefined();
+      expect(result.views).toHaveProperty('user_posts');
+      expect(result.views!.user_posts.query).toBe('select * from posts where user_id = auth.uid()');
+    });
+
+    it('should parse single-line view declaration', () => {
+      const source = `
+        view published_posts as select * from posts where published = true
+      `;
+
+      const result = parseSchema(source);
+      expect(result.views).toBeDefined();
+      expect(result.views!.published_posts.query).toBe('select * from posts where published = true');
+    });
+
+    it('should throw when duplicate view names exist', () => {
+      const source = `
+        view user_posts as select * from posts
+        view user_posts as select id from posts
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/Duplicate view definition/);
     });
   });
 });

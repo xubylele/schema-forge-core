@@ -1,4 +1,5 @@
-import type { DatabaseSchema, PolicyNode } from '../../types/schema.js';
+import { deterministicIndexName } from '../normalize.js';
+import type { DatabaseSchema, IndexNode, PolicyNode } from '../../types/schema.js';
 
 function renderColumn(column: {
   name: string;
@@ -46,6 +47,31 @@ function renderPolicy(policy: PolicyNode): string {
   return lines.join('\n');
 }
 
+function renderIndex(index: IndexNode): string {
+  const resolvedName = index.name || deterministicIndexName({
+    table: index.table,
+    columns: index.columns,
+    expression: index.expression,
+  });
+
+  const lines: string[] = [`index ${resolvedName} on ${index.table}`];
+  if (index.expression) {
+    lines.push(`expression ${index.expression}`);
+  } else {
+    lines.push(`columns ${index.columns.join(', ')}`);
+  }
+
+  if (index.unique) {
+    lines.push('unique');
+  }
+
+  if (index.where) {
+    lines.push(`where ${index.where}`);
+  }
+
+  return lines.join('\n');
+}
+
 export function schemaToDsl(schema: DatabaseSchema): string {
   const tableNames = Object.keys(schema.tables).sort((left, right) => left.localeCompare(right));
 
@@ -60,6 +86,21 @@ export function schemaToDsl(schema: DatabaseSchema): string {
 
     tableLines.push('}');
     blocks.push(tableLines.join('\n'));
+
+    const sortedIndexes = (table.indexes ?? [])
+      .map(index => ({
+        ...index,
+        name: index.name || deterministicIndexName({
+          table: index.table,
+          columns: index.columns,
+          expression: index.expression,
+        }),
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+
+    for (const index of sortedIndexes) {
+      blocks.push(renderIndex(index));
+    }
 
     if (table.policies?.length) {
       for (const policy of table.policies) {

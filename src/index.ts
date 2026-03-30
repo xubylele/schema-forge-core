@@ -10,6 +10,8 @@ export { classifyOperation, checkOperationSafety, checkSchemaSafety } from './co
 export type { SafetyLevel, Finding as SafeFinding, SafetyReport, DestructiveOperationCode } from './core/safety/index.js';
 
 export { schemaToState, loadState, saveState } from './core/state-manager.js';
+export { buildMigrationPlan, formatMigrationPlanLine, formatMigrationPlanLines } from './core/plan-builder.js';
+export type { MigrationPlanAction, MigrationPlanSymbol, MigrationPlanEntry, MigrationPlanResult } from './core/plan-builder.js';
 
 export { generateSql } from './generator/sql-generator.js';
 export type { Provider, SqlConfig } from './generator/sql-generator.js';
@@ -24,7 +26,17 @@ export { introspectPostgresSchema } from './core/sql/introspect-postgres.js';
 
 export { ensureDir, fileExists, readTextFile, writeTextFile, readJsonFile, writeJsonFile, findFiles } from './core/fs.js';
 
-export { normalizeIdent, pkName, uqName, legacyPkName, legacyUqName, normalizeDefault } from './core/normalize.js';
+export {
+	normalizeIdent,
+	pkName,
+	uqName,
+	legacyPkName,
+	legacyUqName,
+	normalizeDefault,
+	normalizeSqlExpression,
+	hashSqlContent,
+	deterministicIndexName,
+} from './core/normalize.js';
 
 export { getProjectRoot, getSchemaForgeDir, getSchemaFilePath, getConfigPath, getStatePath } from './core/paths.js';
 
@@ -40,8 +52,12 @@ export type {
 	DatabaseSchema,
 	PolicyCommand,
 	PolicyNode,
+	IndexNode,
+	ViewNode,
 	StateColumn,
+	StateIndex,
 	StatePolicy,
+	StateView,
 	StateTable,
 	StateFile,
 	DriftColumnDifference,

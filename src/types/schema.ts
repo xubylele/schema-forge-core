@@ -34,6 +34,35 @@ export interface StatePolicy {
   to?: string[];
 }
 
+export interface IndexNode {
+  name: string;
+  table: string;
+  columns: string[];
+  unique: boolean;
+  where?: string;
+  expression?: string;
+}
+
+export interface StateIndex {
+  name: string;
+  table: string;
+  columns: string[];
+  unique: boolean;
+  where?: string;
+  expression?: string;
+}
+
+export interface ViewNode {
+  name: string;
+  query: string;
+  hash: string;
+}
+
+export interface StateView {
+  query: string;
+  hash?: string;
+}
+
 export interface Column {
   name: string;
   type: ColumnType;
@@ -48,11 +77,13 @@ export interface Table {
   name: string;
   columns: Column[];
   primaryKey?: string | null;
+  indexes?: IndexNode[];
   policies?: PolicyNode[];
 }
 
 export interface DatabaseSchema {
   tables: Record<string, Table>;
+  views?: Record<string, ViewNode>;
 }
 
 export interface StateColumn {
@@ -67,12 +98,14 @@ export interface StateColumn {
 export interface StateTable {
   columns: Record<string, StateColumn>;
   primaryKey?: string | null;
+  indexes?: Record<string, StateIndex>;
   policies?: Record<string, StatePolicy>;
 }
 
 export interface StateFile {
   version: 1;
   tables: Record<string, StateTable>;
+  views?: Record<string, StateView>;
 }
 
 export interface DriftColumnDifference {
@@ -134,8 +167,13 @@ export type Operation =
     tableName: string;
     columnName: string;
   }
+  | { kind: 'create_index'; tableName: string; index: IndexNode }
+  | { kind: 'drop_index'; tableName: string; index: StateIndex }
   | { kind: 'create_policy'; tableName: string; policy: PolicyNode }
   | { kind: 'drop_policy'; tableName: string; policyName: string }
+  | { kind: 'create_view'; view: ViewNode }
+  | { kind: 'drop_view'; viewName: string }
+  | { kind: 'replace_view'; view: ViewNode }
   | {
     kind: 'modify_policy';
     tableName: string;
