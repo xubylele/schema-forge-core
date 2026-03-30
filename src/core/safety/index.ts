@@ -21,6 +21,7 @@ export type DestructiveOperationCode =
   | 'DROP_COLUMN'
   | 'ALTER_COLUMN_TYPE'
   | 'SET_NOT_NULL'
+  | 'DROP_INDEX'
   | 'DROP_POLICY'
   | 'MODIFY_POLICY';
 

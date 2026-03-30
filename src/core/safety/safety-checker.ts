@@ -157,6 +157,15 @@ export function checkOperationSafety(operation: Operation): Finding | null {
         operationKind: operation.kind,
       };
 
+    case 'drop_index':
+      return {
+        safetyLevel,
+        code: 'DROP_INDEX',
+        table: operation.tableName,
+        message: `Index '${operation.index.name}' removed`,
+        operationKind: operation.kind,
+      };
+
     case 'drop_policy':
       return {
         safetyLevel,

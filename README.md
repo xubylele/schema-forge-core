@@ -161,7 +161,7 @@ Schema Forge supports **Row Level Security (RLS)** policies in the DSL. Policies
 
 Policies are declared at the top level (outside table blocks). The table must be defined before the policy references it.
 
-```
+```sql
 table users {
   id uuid pk
   email text unique
@@ -186,7 +186,7 @@ At least one of `using` or `with check` is required (enforced by `validateSchema
 * **State:** `StateTable.policies` is `Record<string, StatePolicy>` (keyed by policy name; `StatePolicy` has `command`, `using?`, `withCheck?`).
 * **Operations:** The diff engine emits `create_policy`, `drop_policy`, and `modify_policy` (drop + create) when comparing state to schema.
 
-### Validation
+### Validation Schema Forge enforces basic policy validity rules
 
 `validateSchema(schema)` runs policy checks and throws if:
 

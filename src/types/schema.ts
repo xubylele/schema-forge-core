@@ -34,6 +34,24 @@ export interface StatePolicy {
   to?: string[];
 }
 
+export interface IndexNode {
+  name: string;
+  table: string;
+  columns: string[];
+  unique: boolean;
+  where?: string;
+  expression?: string;
+}
+
+export interface StateIndex {
+  name: string;
+  table: string;
+  columns: string[];
+  unique: boolean;
+  where?: string;
+  expression?: string;
+}
+
 export interface Column {
   name: string;
   type: ColumnType;
@@ -48,6 +66,7 @@ export interface Table {
   name: string;
   columns: Column[];
   primaryKey?: string | null;
+  indexes?: IndexNode[];
   policies?: PolicyNode[];
 }
 
@@ -67,6 +86,7 @@ export interface StateColumn {
 export interface StateTable {
   columns: Record<string, StateColumn>;
   primaryKey?: string | null;
+  indexes?: Record<string, StateIndex>;
   policies?: Record<string, StatePolicy>;
 }
 
@@ -134,6 +154,8 @@ export type Operation =
     tableName: string;
     columnName: string;
   }
+  | { kind: 'create_index'; tableName: string; index: IndexNode }
+  | { kind: 'drop_index'; tableName: string; index: StateIndex }
   | { kind: 'create_policy'; tableName: string; policy: PolicyNode }
   | { kind: 'drop_policy'; tableName: string; policyName: string }
   | {

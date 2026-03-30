@@ -24,7 +24,16 @@ export { introspectPostgresSchema } from './core/sql/introspect-postgres.js';
 
 export { ensureDir, fileExists, readTextFile, writeTextFile, readJsonFile, writeJsonFile, findFiles } from './core/fs.js';
 
-export { normalizeIdent, pkName, uqName, legacyPkName, legacyUqName, normalizeDefault } from './core/normalize.js';
+export {
+	normalizeIdent,
+	pkName,
+	uqName,
+	legacyPkName,
+	legacyUqName,
+	normalizeDefault,
+	normalizeSqlExpression,
+	deterministicIndexName,
+} from './core/normalize.js';
 
 export { getProjectRoot, getSchemaForgeDir, getSchemaFilePath, getConfigPath, getStatePath } from './core/paths.js';
 
@@ -40,7 +49,9 @@ export type {
 	DatabaseSchema,
 	PolicyCommand,
 	PolicyNode,
+	IndexNode,
 	StateColumn,
+	StateIndex,
 	StatePolicy,
 	StateTable,
 	StateFile,

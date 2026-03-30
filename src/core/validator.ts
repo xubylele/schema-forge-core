@@ -1,9 +1,11 @@
 import type {
   ColumnType,
   DatabaseSchema,
+  IndexNode,
   PolicyCommand,
   Table
 } from '../types/schema.js';
+import { deterministicIndexName } from './normalize.js';
 
 const VALID_POLICY_COMMANDS: PolicyCommand[] = [
   'select',
@@ -62,9 +64,82 @@ export function validateSchema(schema: DatabaseSchema): void {
   for (const tableName in schema.tables) {
     const table = schema.tables[tableName];
     validateTableColumns(tableName, table, schema.tables);
+    validateTableIndexes(tableName, table, schema.tables);
   }
 
   validatePolicies(schema);
+}
+
+function validateTableIndexes(
+  tableName: string,
+  table: Table,
+  allTables: Record<string, Table>
+): void {
+  if (!table.indexes?.length) {
+    return;
+  }
+
+  const normalizedNames = new Set<string>();
+
+  for (const index of table.indexes) {
+    validateSingleIndex(tableName, table, index, allTables);
+
+    const effectiveName = index.name?.trim() || deterministicIndexName({
+      table: index.table,
+      columns: index.columns,
+      expression: index.expression,
+    });
+
+    if (normalizedNames.has(effectiveName)) {
+      throw new Error(`Table '${tableName}': duplicate index name '${effectiveName}'`);
+    }
+
+    normalizedNames.add(effectiveName);
+  }
+}
+
+function validateSingleIndex(
+  tableName: string,
+  table: Table,
+  index: IndexNode,
+  allTables: Record<string, Table>
+): void {
+  if (!allTables[index.table]) {
+    throw new Error(
+      `Table '${tableName}': index '${index.name}' references table '${index.table}' which does not exist`
+    );
+  }
+
+  if (index.table !== tableName) {
+    throw new Error(
+      `Table '${tableName}': index '${index.name}' must target table '${tableName}'`
+    );
+  }
+
+  const hasColumns = index.columns.length > 0;
+  const hasExpression = index.expression !== undefined;
+  if ((hasColumns && hasExpression) || (!hasColumns && !hasExpression)) {
+    throw new Error(
+      `Table '${tableName}': index '${index.name}' must define exactly one of columns or expression`
+    );
+  }
+
+  if (hasExpression && index.expression!.trim().length === 0) {
+    throw new Error(
+      `Table '${tableName}': index '${index.name}' expression cannot be empty`
+    );
+  }
+
+  if (hasColumns) {
+    const tableColumns = new Set(table.columns.map(column => column.name));
+    for (const columnName of index.columns) {
+      if (!tableColumns.has(columnName)) {
+        throw new Error(
+          `Table '${tableName}': index '${index.name}' references unknown column '${columnName}'`
+        );
+      }
+    }
+  }
 }
 
 /**

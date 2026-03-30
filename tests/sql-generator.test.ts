@@ -1108,5 +1108,70 @@ describe('SQL Generator', () => {
 
       expect(generateSql(diff, 'postgres')).toBe(generateSql(diff, 'postgres'));
     });
+
+    it('should generate create index SQL', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_index',
+            tableName: 'users',
+            index: {
+              name: 'idx_users_email',
+              table: 'users',
+              columns: ['email'],
+              unique: false,
+            },
+          },
+        ],
+      };
+
+      expect(generateSql(diff, 'postgres')).toBe(
+        'CREATE INDEX idx_users_email ON users (email);'
+      );
+    });
+
+    it('should generate create unique partial expression index SQL', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'create_index',
+            tableName: 'users',
+            index: {
+              name: 'idx_users_lower_email',
+              table: 'users',
+              columns: [],
+              unique: true,
+              expression: 'lower(email)',
+              where: 'deleted_at is null',
+            },
+          },
+        ],
+      };
+
+      expect(generateSql(diff, 'postgres')).toBe(
+        'CREATE UNIQUE INDEX idx_users_lower_email ON users (lower(email)) WHERE deleted_at is null;'
+      );
+    });
+
+    it('should generate drop index SQL with deterministic fallback', () => {
+      const diff: DiffResult = {
+        operations: [
+          {
+            kind: 'drop_index',
+            tableName: 'users',
+            index: {
+              name: 'idx_users_email',
+              table: 'users',
+              columns: ['email'],
+              unique: false,
+            },
+          },
+        ],
+      };
+
+      expect(generateSql(diff, 'postgres')).toBe(
+        'DROP INDEX IF EXISTS idx_users_email;'
+      );
+    });
   });
 });
