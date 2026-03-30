@@ -10,6 +10,8 @@ export { classifyOperation, checkOperationSafety, checkSchemaSafety } from './co
 export type { SafetyLevel, Finding as SafeFinding, SafetyReport, DestructiveOperationCode } from './core/safety/index.js';
 
 export { schemaToState, loadState, saveState } from './core/state-manager.js';
+export { buildMigrationPlan, formatMigrationPlanLine, formatMigrationPlanLines } from './core/plan-builder.js';
+export type { MigrationPlanAction, MigrationPlanSymbol, MigrationPlanEntry, MigrationPlanResult } from './core/plan-builder.js';
 
 export { generateSql } from './generator/sql-generator.js';
 export type { Provider, SqlConfig } from './generator/sql-generator.js';

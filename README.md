@@ -17,11 +17,9 @@ Same input → same output.
 
 ---
 
-## What's New (v1.3.0)
+## What's New (v1.6.0)
 
-* Added `analyzeSchemaDrift(state, liveSchema)` to compare live database schemas against `state.json`.
-* Added PostgreSQL schema introspection with typed metadata for tables, columns, and constraints.
-* Expanded exports and tests for deterministic behavior and safer integration usage.
+* Added migration plan builder APIs: `buildMigrationPlan`, `formatMigrationPlanLine`, and `formatMigrationPlanLines` to preview operations as human-readable steps (`+` create, `~` modify, `-` delete) without SQL execution.
 * Added PostgreSQL view support in DSL with deterministic hash-based diffing and `CREATE OR REPLACE VIEW` generation.
 * Added PostgreSQL index support in DSL, including unique, partial, and expression indexes with deterministic auto-naming.
 
@@ -123,6 +121,48 @@ const sql = generateSql(diff, "postgres")
 console.log(sql)
 // ALTER TABLE users ADD COLUMN name varchar;
 ```
+
+---
+
+## Migration Plan Preview
+
+Schema Forge Core can convert diff operations into a human-readable migration plan without executing SQL.
+
+Use this when you want a clear preview of what will happen before generating or running migrations.
+
+```ts
+import {
+  parseSchema,
+  schemaToState,
+  diffSchemas,
+  buildMigrationPlan,
+} from "@xubylele/schema-forge-core"
+
+const currentSchema = parseSchema(currentSchemaSource)
+const currentState = await schemaToState(currentSchema)
+
+const nextSchema = parseSchema(nextSchemaSource)
+const diff = diffSchemas(currentState, nextSchema)
+
+const plan = buildMigrationPlan(diff)
+
+console.log(plan.lines.join("\n"))
+// + create table posts
+// + add column avatar_url to users
+// ~ modify column email type on users (varchar -> text)
+// - drop column age from users
+```
+
+The plan result contains:
+
+* `entries`: structured metadata for each operation (`action`, `symbol`, `operationKind`, `summary`, and optional table/column/from/to fields).
+* `lines`: preformatted human-readable lines ready for CLI or UI output.
+
+Symbol mapping is deterministic:
+
+* `+` create/add operations
+* `~` modify/change/replace operations
+* `-` drop/delete operations
 
 ---
 
