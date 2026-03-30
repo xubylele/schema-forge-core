@@ -52,6 +52,8 @@ export {
   legacyPkName,
   legacyUqName,
   normalizeDefault,
+  normalizeSqlExpression,
+  deterministicIndexName,
 } from './core/normalize.js';
 
 export { nowTimestamp, slugifyName } from './core/utils.js';
@@ -65,7 +67,9 @@ export type {
   DatabaseSchema,
   PolicyCommand,
   PolicyNode,
+  IndexNode,
   StateColumn,
+  StateIndex,
   StatePolicy,
   StateTable,
   StateFile,

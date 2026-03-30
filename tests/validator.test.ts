@@ -469,4 +469,103 @@ describe('validateSchema', () => {
       );
     });
   });
+
+  describe('index validation', () => {
+    it('should validate a valid table index', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'uuid', primaryKey: true },
+              { name: 'email', type: 'text' },
+            ],
+            indexes: [
+              {
+                name: 'idx_users_email',
+                table: 'users',
+                columns: ['email'],
+                unique: false,
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).not.toThrow();
+    });
+
+    it('should throw for index on unknown column', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            indexes: [
+              {
+                name: 'idx_users_email',
+                table: 'users',
+                columns: ['email'],
+                unique: false,
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).toThrow(/references unknown column 'email'/);
+    });
+
+    it('should throw for expression index with empty expression', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [{ name: 'id', type: 'uuid', primaryKey: true }],
+            indexes: [
+              {
+                name: 'idx_users_expr',
+                table: 'users',
+                columns: [],
+                unique: false,
+                expression: '   ',
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).toThrow(/expression cannot be empty/);
+    });
+
+    it('should throw for duplicate index names in same table', () => {
+      const schema: DatabaseSchema = {
+        tables: {
+          users: {
+            name: 'users',
+            columns: [
+              { name: 'id', type: 'uuid', primaryKey: true },
+              { name: 'email', type: 'text' },
+            ],
+            indexes: [
+              {
+                name: 'idx_users_email',
+                table: 'users',
+                columns: ['email'],
+                unique: false,
+              },
+              {
+                name: 'idx_users_email',
+                table: 'users',
+                columns: ['id'],
+                unique: false,
+              },
+            ],
+          },
+        },
+      };
+
+      expect(() => validateSchema(schema)).toThrow(/duplicate index name 'idx_users_email'/);
+    });
+  });
 });

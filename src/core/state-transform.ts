@@ -2,6 +2,7 @@ import type {
   DatabaseSchema,
   StateColumn,
   StateFile,
+  StateIndex,
   StatePolicy,
   StateTable,
 } from '../types/schema.js';
@@ -42,9 +43,25 @@ export async function schemaToState(schema: DatabaseSchema): Promise<StateFile> 
       }
     }
 
+    let indexes: Record<string, StateIndex> | undefined;
+    if (table.indexes?.length) {
+      indexes = {};
+      for (const index of table.indexes) {
+        indexes[index.name] = {
+          name: index.name,
+          table: index.table,
+          columns: [...index.columns],
+          unique: index.unique,
+          ...(index.where !== undefined && { where: index.where }),
+          ...(index.expression !== undefined && { expression: index.expression }),
+        };
+      }
+    }
+
     tables[tableName] = {
       columns,
       ...(primaryKeyColumn !== null && { primaryKey: primaryKeyColumn }),
+      ...(indexes !== undefined && { indexes }),
       ...(policies !== undefined && { policies }),
     };
   }

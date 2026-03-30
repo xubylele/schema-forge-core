@@ -78,6 +78,21 @@ describe('classifyOperation', () => {
       expect(classifyOperation(operation)).toBe('SAFE');
     });
 
+    it('classifies create_index as SAFE', () => {
+      const operation: Operation = {
+        kind: 'create_index',
+        tableName: 'users',
+        index: {
+          name: 'idx_users_email',
+          table: 'users',
+          columns: ['email'],
+          unique: false,
+        },
+      };
+
+      expect(classifyOperation(operation)).toBe('SAFE');
+    });
+
     it('classifies column_nullability_changed (not null to nullable) as SAFE', () => {
       const operation: Operation = {
         kind: 'column_nullability_changed',
@@ -192,6 +207,21 @@ describe('classifyOperation', () => {
   });
 
   describe('WARNING operations', () => {
+    it('classifies drop_index as WARNING', () => {
+      const operation: Operation = {
+        kind: 'drop_index',
+        tableName: 'users',
+        index: {
+          name: 'idx_users_email',
+          table: 'users',
+          columns: ['email'],
+          unique: false,
+        },
+      };
+
+      expect(classifyOperation(operation)).toBe('WARNING');
+    });
+
     it('classifies column_nullability_changed (nullable to not null) as WARNING', () => {
       const operation: Operation = {
         kind: 'column_nullability_changed',
