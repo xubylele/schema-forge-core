@@ -991,4 +991,62 @@ describe('parseSchema', () => {
       expect(() => parseSchema(source)).toThrow(/references undefined table/);
     });
   });
+
+  describe('view parsing', () => {
+    it('should parse top-level view and store raw query body with hash', () => {
+      const source = `
+        table posts {
+          id uuid pk
+          user_id uuid
+        }
+
+        view user_posts as
+        select * from posts where user_id = auth.uid()
+      `;
+
+      const result = parseSchema(source);
+
+      expect(result.views).toBeDefined();
+      expect(result.views).toHaveProperty('user_posts');
+      expect(result.views!.user_posts.query).toBe('select * from posts where user_id = auth.uid()');
+      expect(result.views!.user_posts.hash).toMatch(/^[a-z0-9]+$/i);
+    });
+
+    it('should parse view declared inside table block and model as global view', () => {
+      const source = `
+        table posts {
+          id uuid pk
+          user_id uuid
+
+          view user_posts as
+          select * from posts where user_id = auth.uid()
+        }
+      `;
+
+      const result = parseSchema(source);
+      expect(result.tables.posts.columns).toHaveLength(2);
+      expect(result.views).toBeDefined();
+      expect(result.views).toHaveProperty('user_posts');
+      expect(result.views!.user_posts.query).toBe('select * from posts where user_id = auth.uid()');
+    });
+
+    it('should parse single-line view declaration', () => {
+      const source = `
+        view published_posts as select * from posts where published = true
+      `;
+
+      const result = parseSchema(source);
+      expect(result.views).toBeDefined();
+      expect(result.views!.published_posts.query).toBe('select * from posts where published = true');
+    });
+
+    it('should throw when duplicate view names exist', () => {
+      const source = `
+        view user_posts as select * from posts
+        view user_posts as select id from posts
+      `;
+
+      expect(() => parseSchema(source)).toThrow(/Duplicate view definition/);
+    });
+  });
 });

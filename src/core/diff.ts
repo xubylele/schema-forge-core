@@ -9,8 +9,15 @@ import type {
   StateFile,
   StateIndex,
   StatePolicy,
+  StateView,
+  ViewNode,
 } from '../types/schema.js';
-import { deterministicIndexName, normalizeDefault, normalizeSqlExpression } from './normalize.js';
+import {
+  deterministicIndexName,
+  hashSqlContent,
+  normalizeDefault,
+  normalizeSqlExpression,
+} from './normalize.js';
 
 /**
  * Extract table names from a stored state file.
@@ -131,6 +138,20 @@ function indexesEqual(previous: StateIndex, current: IndexNode): boolean {
   if (normalizeIndexExpression(previous.expression) !== normalizeIndexExpression(current.expression)) return false;
 
   return true;
+}
+
+function resolveStateViewHash(view: StateView): string {
+  if (view.hash && view.hash.trim().length > 0) {
+    return view.hash;
+  }
+  return hashSqlContent(view.query);
+}
+
+function resolveSchemaViewHash(view: ViewNode): string {
+  if (view.hash && view.hash.trim().length > 0) {
+    return view.hash;
+  }
+  return hashSqlContent(view.query);
 }
 
 /**
@@ -470,6 +491,42 @@ export function diffSchemas(oldState: StateFile, newSchema: DatabaseSchema): Dif
       if (!newPolicyNames.has(policyName)) {
         operations.push({ kind: 'drop_policy', tableName, policyName });
       }
+    }
+  }
+
+  const oldViews = oldState.views ?? {};
+  const newViews = newSchema.views ?? {};
+  const oldViewNames = Object.keys(oldViews).sort((a, b) => a.localeCompare(b));
+  const newViewNames = Object.keys(newViews).sort((a, b) => a.localeCompare(b));
+  const oldViewNameSet = new Set(oldViewNames);
+  const newViewNameSet = new Set(newViewNames);
+
+  for (const viewName of newViewNames) {
+    const nextView = newViews[viewName];
+    if (!nextView) {
+      continue;
+    }
+
+    if (!oldViewNameSet.has(viewName)) {
+      operations.push({ kind: 'create_view', view: nextView });
+      continue;
+    }
+
+    const prevView = oldViews[viewName];
+    if (!prevView) {
+      continue;
+    }
+
+    const oldHash = resolveStateViewHash(prevView);
+    const newHash = resolveSchemaViewHash(nextView);
+    if (oldHash !== newHash) {
+      operations.push({ kind: 'replace_view', view: nextView });
+    }
+  }
+
+  for (const viewName of oldViewNames) {
+    if (!newViewNameSet.has(viewName)) {
+      operations.push({ kind: 'drop_view', viewName });
     }
   }
 

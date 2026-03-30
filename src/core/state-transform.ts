@@ -5,6 +5,7 @@ import type {
   StateIndex,
   StatePolicy,
   StateTable,
+  StateView,
 } from '../types/schema.js';
 
 /**
@@ -14,6 +15,7 @@ import type {
  */
 export async function schemaToState(schema: DatabaseSchema): Promise<StateFile> {
   const tables: Record<string, StateTable> = {};
+  let views: Record<string, StateView> | undefined;
 
   for (const [tableName, table] of Object.entries(schema.tables)) {
     const columns: Record<string, StateColumn> = {};
@@ -66,8 +68,19 @@ export async function schemaToState(schema: DatabaseSchema): Promise<StateFile> 
     };
   }
 
+  if (schema.views && Object.keys(schema.views).length > 0) {
+    views = {};
+    for (const [viewName, view] of Object.entries(schema.views)) {
+      views[viewName] = {
+        query: view.query,
+        hash: view.hash,
+      };
+    }
+  }
+
   return {
     version: 1,
     tables,
+    ...(views !== undefined && { views }),
   };
 }

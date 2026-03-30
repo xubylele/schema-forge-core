@@ -13,6 +13,7 @@ import type {
   PolicyNode,
   StateIndex,
   Table,
+  ViewNode,
 } from '../types/schema.js';
 
 export type Provider = 'supabase' | 'postgres';
@@ -99,9 +100,23 @@ function generateOperation(
       return generateCreatePolicy(operation.tableName, operation.policy);
     case 'drop_policy':
       return generateDropPolicy(operation.tableName, operation.policyName);
+    case 'create_view':
+      return generateCreateOrReplaceView(operation.view);
+    case 'drop_view':
+      return generateDropView(operation.viewName);
+    case 'replace_view':
+      return generateCreateOrReplaceView(operation.view);
     case 'modify_policy':
       return generateModifyPolicy(operation.tableName, operation.policyName, operation.policy);
   }
+}
+
+function generateCreateOrReplaceView(view: ViewNode): string {
+  return `CREATE OR REPLACE VIEW ${view.name} AS\n${view.query};`;
+}
+
+function generateDropView(viewName: string): string {
+  return `DROP VIEW IF EXISTS ${viewName};`;
 }
 
 function generateCreateIndex(tableName: string, index: IndexNode): string {
