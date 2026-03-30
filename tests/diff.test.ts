@@ -1177,4 +1177,89 @@ describe('diffSchemas', () => {
       expect(dropIndexPos).toBeLessThan(createIndexPos);
     });
   });
+
+  describe('view diff', () => {
+    it('detects view creation', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {},
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {},
+        views: {
+          user_posts: {
+            name: 'user_posts',
+            query: 'select * from posts where user_id = auth.uid()',
+            hash: 'abc123',
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      expect(result.operations).toEqual([
+        {
+          kind: 'create_view',
+          view: newSchema.views!.user_posts,
+        },
+      ]);
+    });
+
+    it('detects view replacement when hash changes', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {},
+        views: {
+          user_posts: {
+            query: 'select * from posts where user_id = auth.uid()',
+            hash: 'old_hash',
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {},
+        views: {
+          user_posts: {
+            name: 'user_posts',
+            query: 'select id, title from posts where user_id = auth.uid()',
+            hash: 'new_hash',
+          },
+        },
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      expect(result.operations).toEqual([
+        {
+          kind: 'replace_view',
+          view: newSchema.views!.user_posts,
+        },
+      ]);
+    });
+
+    it('detects view drop', () => {
+      const oldState: StateFile = {
+        version: 1,
+        tables: {},
+        views: {
+          user_posts: {
+            query: 'select * from posts',
+            hash: 'abc123',
+          },
+        },
+      };
+
+      const newSchema: DatabaseSchema = {
+        tables: {},
+      };
+
+      const result = diffSchemas(oldState, newSchema);
+      expect(result.operations).toEqual([
+        {
+          kind: 'drop_view',
+          viewName: 'user_posts',
+        },
+      ]);
+    });
+  });
 });

@@ -184,6 +184,24 @@ export function checkOperationSafety(operation: Operation): Finding | null {
         operationKind: operation.kind,
       };
 
+    case 'drop_view':
+      return {
+        safetyLevel,
+        code: 'DROP_VIEW',
+        table: operation.viewName,
+        message: 'View removed',
+        operationKind: operation.kind,
+      };
+
+    case 'replace_view':
+      return {
+        safetyLevel,
+        code: 'REPLACE_VIEW',
+        table: operation.view.name,
+        message: 'View definition changed',
+        operationKind: operation.kind,
+      };
+
     default:
       return null;
   }

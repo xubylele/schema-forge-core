@@ -144,6 +144,15 @@ export function classifyOperation(operation: Operation): SafetyLevel {
     case 'modify_policy':
       return 'WARNING';
 
+    case 'create_view':
+      return 'SAFE';
+
+    case 'drop_view':
+      return 'DESTRUCTIVE';
+
+    case 'replace_view':
+      return 'WARNING';
+
     default:
       const _exhaustive: never = operation;
       return _exhaustive;

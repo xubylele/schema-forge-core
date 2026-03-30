@@ -36,6 +36,10 @@ function simpleHash(input: string): string {
   return (hash >>> 0).toString(36);
 }
 
+export function hashSqlContent(value: string): string {
+  return simpleHash(value);
+}
+
 export function normalizeSqlExpression(value: string | undefined): string {
   if (!value) {
     return '';

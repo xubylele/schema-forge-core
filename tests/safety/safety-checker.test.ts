@@ -93,6 +93,50 @@ describe('checkOperationSafety', () => {
     });
   });
 
+  describe('DROP_VIEW operation', () => {
+    it('returns Finding for drop_view operation', () => {
+      const operation: Operation = {
+        kind: 'drop_view',
+        viewName: 'user_posts',
+      };
+
+      const result = checkOperationSafety(operation);
+
+      expect(result).not.toBeNull();
+      expect(result).toMatchObject({
+        safetyLevel: 'DESTRUCTIVE',
+        code: 'DROP_VIEW',
+        table: 'user_posts',
+        message: 'View removed',
+        operationKind: 'drop_view',
+      });
+    });
+  });
+
+  describe('REPLACE_VIEW operation', () => {
+    it('returns Finding for replace_view operation', () => {
+      const operation: Operation = {
+        kind: 'replace_view',
+        view: {
+          name: 'user_posts',
+          query: 'select id from posts',
+          hash: 'abc123',
+        },
+      };
+
+      const result = checkOperationSafety(operation);
+
+      expect(result).not.toBeNull();
+      expect(result).toMatchObject({
+        safetyLevel: 'WARNING',
+        code: 'REPLACE_VIEW',
+        table: 'user_posts',
+        message: 'View definition changed',
+        operationKind: 'replace_view',
+      });
+    });
+  });
+
   describe('ALTER_COLUMN_TYPE operation', () => {
     it('returns Finding for UUID type change (DESTRUCTIVE)', () => {
       const operation: Operation = {

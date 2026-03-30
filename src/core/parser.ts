@@ -6,8 +6,9 @@ import type {
   IndexNode,
   PolicyCommand,
   PolicyNode,
+  ViewNode,
 } from '../types/schema.js';
-import { deterministicIndexName, normalizeSqlExpression } from './normalize.js';
+import { deterministicIndexName, hashSqlContent, normalizeSqlExpression } from './normalize.js';
 
 const POLICY_COMMANDS: PolicyCommand[] = ['select', 'insert', 'update', 'delete', 'all'];
 
@@ -51,6 +52,7 @@ export function parseSchema(source: string): DatabaseSchema {
   > = {};
   const policyList: { policy: PolicyNode; startLine: number }[] = [];
   const indexList: { index: IndexNode; startLine: number }[] = [];
+  const viewList: { view: ViewNode; startLine: number }[] = [];
 
   let currentLine = 0;
 
@@ -91,7 +93,7 @@ export function parseSchema(source: string): DatabaseSchema {
     return false;
   }
 
-  function validateIdentifier(identifier: string, lineNum: number, context: 'table' | 'column' | 'foreign key table' | 'foreign key column'): void {
+  function validateIdentifier(identifier: string, lineNum: number, context: 'table' | 'column' | 'foreign key table' | 'foreign key column' | 'view'): void {
     if (!validIdentifierPattern.test(identifier)) {
       throw new Error(
         `Line ${lineNum}: Invalid ${context} name '${identifier}'. Use letters, numbers, and underscores, and do not start with a number.`
@@ -453,6 +455,69 @@ export function parseSchema(source: string): DatabaseSchema {
     return { policy, nextLineIndex: lineIdx };
   }
 
+  const policyDeclRegex = /^policy\s+"([^"]*)"\s+on\s+\w+/;
+
+  function parseViewDeclaration(
+    startLine: number,
+    options?: { stopAtTableClose?: boolean }
+  ): { view: ViewNode; nextLineIndex: number } {
+    const firstLine = cleanLine(lines[startLine]);
+    const declMatch = firstLine.match(/^view\s+(\w+)\s+as(?:\s+([\s\S]+))?$/);
+
+    if (!declMatch) {
+      throw new Error(`Line ${startLine + 1}: Invalid view declaration. Expected: view <name> as <sql>`);
+    }
+
+    const viewName = declMatch[1];
+    validateIdentifier(viewName, startLine + 1, 'view');
+
+    const queryLines: string[] = [];
+    const inlineQuery = declMatch[2]?.trim();
+    if (inlineQuery) {
+      queryLines.push(inlineQuery);
+    }
+
+    let lineIdx = startLine + 1;
+    while (lineIdx < lines.length) {
+      const rawLine = lines[lineIdx];
+      const cleaned = cleanLine(rawLine);
+
+      if (!cleaned) {
+        if (queryLines.length > 0) {
+          queryLines.push('');
+        }
+        lineIdx++;
+        continue;
+      }
+
+      if (
+        cleaned.startsWith('table ') ||
+        policyDeclRegex.test(cleaned) ||
+        cleaned.startsWith('index ') ||
+        cleaned.startsWith('view ') ||
+        (options?.stopAtTableClose === true && cleaned === '}')
+      ) {
+        break;
+      }
+
+      queryLines.push(rawLine.trim());
+      lineIdx++;
+    }
+
+    const query = queryLines.join('\n').trim();
+    if (!query) {
+      throw new Error(`Line ${startLine + 1}: View '${viewName}' is missing SQL query body`);
+    }
+
+    const view: ViewNode = {
+      name: viewName,
+      query,
+      hash: hashSqlContent(query),
+    };
+
+    return { view, nextLineIndex: lineIdx };
+  }
+
   /**
    * Parse a table block
    */
@@ -487,6 +552,13 @@ export function parseSchema(source: string): DatabaseSchema {
       if (cleaned === '}') {
         foundClosingBrace = true;
         break;
+      }
+
+      if (cleaned.startsWith('view ')) {
+        const { view, nextLineIndex } = parseViewDeclaration(lineIdx, { stopAtTableClose: true });
+        viewList.push({ view, startLine: lineIdx + 1 });
+        lineIdx = nextLineIndex;
+        continue;
       }
 
       try {
@@ -674,7 +746,6 @@ export function parseSchema(source: string): DatabaseSchema {
     };
   }
 
-  const policyDeclRegex = /^policy\s+"([^"]*)"\s+on\s+\w+/;
   while (currentLine < lines.length) {
     const cleaned = cleanLine(lines[currentLine]);
 
@@ -694,9 +765,13 @@ export function parseSchema(source: string): DatabaseSchema {
       const { index, nextLineIndex } = parseIndexDeclaration(currentLine);
       indexList.push({ index, startLine: currentLine + 1 });
       currentLine = nextLineIndex;
+    } else if (cleaned.startsWith('view ')) {
+      const { view, nextLineIndex } = parseViewDeclaration(currentLine);
+      viewList.push({ view, startLine: currentLine + 1 });
+      currentLine = nextLineIndex;
     } else {
       throw new Error(
-        `Line ${currentLine + 1}: Unexpected content '${cleaned}'. Expected table, index, or policy definition.`
+        `Line ${currentLine + 1}: Unexpected content '${cleaned}'. Expected table, index, view, or policy definition.`
       );
     }
   }
@@ -727,5 +802,16 @@ export function parseSchema(source: string): DatabaseSchema {
     tables[policy.table].policies!.push(policy);
   }
 
-  return { tables };
+  const views: Record<string, ViewNode> = {};
+  for (const { view, startLine } of viewList) {
+    if (views[view.name]) {
+      throw new Error(`Line ${startLine}: Duplicate view definition '${view.name}'`);
+    }
+    views[view.name] = view;
+  }
+
+  return {
+    tables,
+    ...(Object.keys(views).length > 0 && { views }),
+  };
 }

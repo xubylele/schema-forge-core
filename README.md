@@ -22,6 +22,7 @@ Same input → same output.
 * Added `analyzeSchemaDrift(state, liveSchema)` to compare live database schemas against `state.json`.
 * Added PostgreSQL schema introspection with typed metadata for tables, columns, and constraints.
 * Expanded exports and tests for deterministic behavior and safer integration usage.
+* Added MVP PostgreSQL view support in DSL with hash-based diff and `CREATE OR REPLACE VIEW` generation.
 
 See full details in the [changelog](./CHANGELOG.md).
 
@@ -208,6 +209,39 @@ RLS must be enabled on the table separately (e.g. `ALTER TABLE ... ENABLE ROW LE
 
 ---
 
+## View Support (MVP)
+
+Schema Forge supports PostgreSQL views in the DSL as raw SQL query bodies.
+
+### DSL syntax
+
+```sql
+view user_posts as
+select * from posts where user_id = auth.uid()
+```
+
+* **Declaration:** `view <name> as <sql>`.
+* **Query body:** stored as raw SQL text in the AST/state.
+* **Scope (MVP):** view definitions are tracked by name and query hash.
+
+### AST, state, and diff behavior
+
+* **AST:** `ViewNode` includes `name`, `query`, and `hash`.
+* **State:** `StateFile.views` stores persisted view definitions.
+* **Diff:** compares view `hash` values.
+  * New view -> `create_view`
+  * Removed view -> `drop_view`
+  * Same name with changed hash -> `replace_view`
+
+### SQL generation
+
+For `postgres`, view operations generate:
+
+* `CREATE OR REPLACE VIEW <name> AS <query>;` (for both create and replace)
+* `DROP VIEW IF EXISTS <name>;`
+
+---
+
 ## SQL Import (Reverse Engineering)
 
 ```ts
@@ -289,6 +323,7 @@ All domain types are exported for integration:
 
 * `DatabaseSchema`, `Table`, `Column`, `ForeignKey`
 * `PolicyNode`, `PolicyCommand`, `StatePolicy`
+* `ViewNode`, `StateView`
 * `StateFile`, `StateTable`, `StateColumn`
 * `DiffResult`, `Operation`
 * `SqlOp`, `ParseResult`, `ApplySqlOpsResult`
@@ -299,7 +334,7 @@ All domain types are exported for integration:
 
 ## Architecture
 
-```
+```bash
 DSL (.sf)
   ↓
 Parser → DatabaseSchema

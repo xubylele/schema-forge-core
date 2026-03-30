@@ -32,6 +32,7 @@ export {
 	legacyUqName,
 	normalizeDefault,
 	normalizeSqlExpression,
+	hashSqlContent,
 	deterministicIndexName,
 } from './core/normalize.js';
 
@@ -50,9 +51,11 @@ export type {
 	PolicyCommand,
 	PolicyNode,
 	IndexNode,
+	ViewNode,
 	StateColumn,
 	StateIndex,
 	StatePolicy,
+	StateView,
 	StateTable,
 	StateFile,
 	DriftColumnDifference,
